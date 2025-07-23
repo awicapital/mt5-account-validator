@@ -133,8 +133,8 @@ export default function DashboardPage() {
               <p>EA: {account.ea_name || "—"}</p>
               <p>
                 Saldo: R${" "}
-                {account.balance !== null && !isNaN(account.balance)
-                  ? parseFloat(account.balance).toFixed(2)
+                {typeof account.balance === "number" && !isNaN(account.balance)
+                  ? account.balance.toFixed(2)
                   : "—"}
               </p>
               <p>
