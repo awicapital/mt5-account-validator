@@ -8,11 +8,21 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader2 } from "lucide-react";
 
+// Tipagem correta para uma conta
+type Account = {
+  id: string;
+  account_number: string;
+  balance: number;
+  ea_name?: string;
+  is_active: boolean;
+  granted_at?: string | null;
+  email: string;
+};
+
 export default function DashboardPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [accounts, setAccounts] = useState<any[]>([]);
-  const [userEmail, setUserEmail] = useState("");
+  const [accounts, setAccounts] = useState<Account[]>([]);
 
   useEffect(() => {
     const fetchAccounts = async () => {
@@ -23,15 +33,13 @@ export default function DashboardPage() {
         return;
       }
 
-      setUserEmail(user.user.email);
-
       const { data, error } = await supabase
         .from("accounts")
         .select("*")
         .eq("email", user.user.email);
 
       if (!error && data) {
-        setAccounts(data);
+        setAccounts(data as Account[]);
       }
 
       setLoading(false);
@@ -85,7 +93,6 @@ export default function DashboardPage() {
 
   return (
     <main className="min-h-screen p-6 bg-slate-100">
-      {/* Título + botão */}
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-semibold">Minhas Contas</h2>
         <Button onClick={() => router.push("/account-request")}>
@@ -93,7 +100,6 @@ export default function DashboardPage() {
         </Button>
       </div>
 
-      {/* Resumo */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <Card>
           <CardContent className="p-6">
@@ -117,7 +123,6 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* Lista de contas */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {accounts.map((account) => (
           <Card key={account.id}>
