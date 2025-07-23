@@ -2,12 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 
-interface Account {
+type Account = {
   id: string;
   account_number: string;
   balance: number;
@@ -15,30 +15,50 @@ interface Account {
   is_active: boolean;
   granted_at?: string | null;
   email: string;
-}
+};
 
-export default function AdminDashboardPage() {
-  const router = useRouter();
-  const [loading, setLoading] = useState(true);
+export default function AdminDashboard() {
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchAccounts = async () => {
       const { data, error } = await supabase.from("accounts").select("*");
-      if (!error && data) setAccounts(data as Account[]);
+
+      if (!error && data) {
+        setAccounts(data as Account[]);
+      }
+
       setLoading(false);
     };
+
     fetchAccounts();
   }, []);
 
-  const activeAccounts = accounts.filter((a) => a.is_active);
-  const pendingAccounts = accounts.filter((a) => !a.is_active && !a.granted_at);
+  const total = accounts.length;
+  const ativos = accounts.filter((a) => a.is_active).length;
+  const pendentes = accounts.filter((a) => !a.is_active && a.granted_at === null).length;
 
   const grouped = accounts.reduce((acc, account) => {
     if (!acc[account.email]) acc[account.email] = [];
     acc[account.email].push(account);
     return acc;
   }, {} as Record<string, Account[]>);
+
+  const toggleStatus = async (account: Account) => {
+    const { error } = await supabase
+      .from("accounts")
+      .update({ is_active: !account.is_active })
+      .eq("id", account.id);
+
+    if (!error) {
+      setAccounts((prev) =>
+        prev.map((a) =>
+          a.id === account.id ? { ...a, is_active: !a.is_active } : a
+        )
+      );
+    }
+  };
 
   if (loading) {
     return (
@@ -49,58 +69,73 @@ export default function AdminDashboardPage() {
   }
 
   return (
-    <main className="min-h-screen p-6 bg-slate-100">
-      <div className="mb-6">
-        <h2 className="text-2xl font-semibold">Painel do Administrador</h2>
+    <main className="min-h-screen p-6 bg-slate-100 space-y-6">
+      <h2 className="text-2xl font-semibold">Painel do Administrador</h2>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <Card>
+          <CardContent className="p-4 text-center">
+            <div className="text-muted-foreground text-sm">Total de Contas</div>
+            <div className="text-3xl font-bold text-blue-600">{total}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4 text-center">
+            <div className="text-muted-foreground text-sm">Contas Ativas</div>
+            <div className="text-3xl font-bold text-green-600">{ativos}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4 text-center">
+            <div className="text-muted-foreground text-sm">Contas Pendentes</div>
+            <div className="text-3xl font-bold text-yellow-500">{pendentes}</div>
+          </CardContent>
+        </Card>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <Card>
-          <CardContent className="p-6">
-            <p className="text-muted-foreground text-sm mb-1">Total de Contas</p>
-            <p className="text-3xl font-bold text-blue-600">{accounts.length}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-6">
-            <p className="text-muted-foreground text-sm mb-1">Contas Ativas</p>
-            <p className="text-3xl font-bold text-green-600">{activeAccounts.length}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-6">
-            <p className="text-muted-foreground text-sm mb-1">Contas Pendentes</p>
-            <p className="text-3xl font-bold text-yellow-500">{pendingAccounts.length}</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="space-y-6">
+      <div className="space-y-8">
         {Object.entries(grouped).map(([email, contas]) => (
           <div key={email}>
-            <h3 className="text-lg font-semibold text-slate-800 mb-2">{email}</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <h3 className="text-lg font-semibold text-muted-foreground">{email}</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mt-2">
               {contas.map((account) => (
                 <Card key={account.id}>
                   <CardContent className="p-4 space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium text-muted-foreground">
+                    <div className="flex justify-between items-start">
+                      <h4 className="text-sm font-medium text-muted-foreground">
                         Conta #{account.account_number}
-                      </span>
-                      <Badge variant={account.is_active ? "default" : "outline"}>
+                      </h4>
+                      <Badge
+                        className={
+                          account.is_active
+                            ? "bg-green-500 text-white"
+                            : "bg-red-500 text-white"
+                        }
+                      >
                         {account.is_active ? "Ativa" : "Inativa"}
                       </Badge>
                     </div>
-                    <div className="grid grid-cols-2 gap-1 text-sm">
-                      <span className="text-muted-foreground">EA:</span>
-                      <span>{account.ea_name || "—"}</span>
-                      <span className="text-muted-foreground">Saldo:</span>
-                      <span>
+
+                    <div className="text-sm space-y-1">
+                      <p className="text-muted-foreground">EA:</p>
+                      <p>{account.ea_name || "—"}</p>
+
+                      <p className="text-muted-foreground">Saldo:</p>
+                      <p>
                         {typeof account.balance === "number"
                           ? `R$ ${account.balance.toFixed(2)}`
                           : "—"}
-                      </span>
+                      </p>
                     </div>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full mt-2"
+                      onClick={() => toggleStatus(account)}
+                    >
+                      {account.is_active ? "Desativar" : "Ativar"}
+                    </Button>
                   </CardContent>
                 </Card>
               ))}
