@@ -4,11 +4,9 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader2 } from "lucide-react";
 
-// Tipagem da conta para uso no admin
 interface Account {
   id: string;
   account_number: string;
@@ -27,19 +25,20 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     const fetchAccounts = async () => {
       const { data, error } = await supabase.from("accounts").select("*");
-
-      if (!error && data) {
-        setAccounts(data as Account[]);
-      }
-
+      if (!error && data) setAccounts(data as Account[]);
       setLoading(false);
     };
-
     fetchAccounts();
   }, []);
 
   const activeAccounts = accounts.filter((a) => a.is_active);
   const pendingAccounts = accounts.filter((a) => !a.is_active && !a.granted_at);
+
+  const grouped = accounts.reduce((acc, account) => {
+    if (!acc[account.email]) acc[account.email] = [];
+    acc[account.email].push(account);
+    return acc;
+  }, {} as Record<string, Account[]>);
 
   if (loading) {
     return (
@@ -76,25 +75,37 @@ export default function AdminDashboardPage() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {accounts.map((account) => (
-          <Card key={account.id}>
-            <CardContent className="p-4 space-y-1">
-              <h3 className="text-lg font-medium">
-                #{account.account_number} — {account.email}
-              </h3>
-              <p>EA: {account.ea_name || "—"}</p>
-              <p>
-                Saldo: R$ {typeof account.balance === "number" && !isNaN(account.balance) ? account.balance.toFixed(2) : "—"}
-              </p>
-              <p>
-                Status: {" "}
-                <Badge variant={account.is_active ? "default" : "outline"}>
-                  {account.is_active ? "Ativa" : "Inativa"}
-                </Badge>
-              </p>
-            </CardContent>
-          </Card>
+      <div className="space-y-6">
+        {Object.entries(grouped).map(([email, contas]) => (
+          <div key={email}>
+            <h3 className="text-lg font-semibold text-slate-800 mb-2">{email}</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {contas.map((account) => (
+                <Card key={account.id}>
+                  <CardContent className="p-4 space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium text-muted-foreground">
+                        Conta #{account.account_number}
+                      </span>
+                      <Badge variant={account.is_active ? "default" : "outline"}>
+                        {account.is_active ? "Ativa" : "Inativa"}
+                      </Badge>
+                    </div>
+                    <div className="grid grid-cols-2 gap-1 text-sm">
+                      <span className="text-muted-foreground">EA:</span>
+                      <span>{account.ea_name || "—"}</span>
+                      <span className="text-muted-foreground">Saldo:</span>
+                      <span>
+                        {typeof account.balance === "number"
+                          ? `R$ ${account.balance.toFixed(2)}`
+                          : "—"}
+                      </span>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
         ))}
       </div>
     </main>
