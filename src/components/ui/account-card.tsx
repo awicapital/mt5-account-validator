@@ -11,11 +11,17 @@ type AccountCardProps = {
   };
   showControls?: boolean;
   onToggle?: () => void;
+  className?: string; // adicionada prop className opcional
 };
 
-export function AccountCard({ account, showControls = false, onToggle }: AccountCardProps) {
+export function AccountCard({
+  account,
+  showControls = false,
+  onToggle,
+  className,
+}: AccountCardProps) {
   return (
-    <Card>
+    <Card className={className}>
       <CardContent className="p-4 space-y-2">
         <div className="flex justify-between items-start">
           <h4 className="text-sm font-medium text-muted-foreground">
