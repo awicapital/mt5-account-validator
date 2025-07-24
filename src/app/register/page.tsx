@@ -11,60 +11,100 @@ import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 
 export default function RegisterPage() {
+  const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
   const handleRegister = async () => {
-    setLoading(true);
-
-    if (!email || !senha) {
+    if (!nome || !email || !senha) {
       toast.error("Preencha todos os campos.");
-      setLoading(false);
       return;
     }
+    setLoading(true);
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password: senha,
+      options: {
+        data: { nome },
+      },
     });
 
     if (error) {
       toast.error("Erro ao criar conta: " + error.message);
-    } else {
-      toast.success("Conta criada com sucesso!");
-      router.push("/dashboard");
+      setLoading(false);
+      return;
     }
 
+    if (data.user) {
+      const { error: updateError } = await supabase.auth.updateUser({
+        display_name: nome,
+      });
+
+      if (updateError) {
+        toast.error("Erro ao atualizar nome: " + updateError.message);
+      }
+    }
+
+    toast.success("Conta criada com sucesso!");
     setLoading(false);
+    router.push("/dashboard");
   };
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-slate-100 px-4">
-      <Card className="w-full max-w-sm shadow-lg">
+    <main
+      className="min-h-screen flex items-center justify-center px-4"
+      style={{ backgroundColor: "#03182f" }}
+    >
+      <Card className="w-full max-w-sm rounded-lg bg-[#03182f] border-0 shadow-none">
         <CardContent className="p-6 space-y-6">
-          <h1 className="text-2xl font-semibold text-center">Criar conta</h1>
+          <h1 className="text-2xl font-semibold text-center text-white">Criar conta</h1>
+
+          <p className="text-center text-sm text-muted-foreground -mt-2 mb-4">
+            Insira seus dados para criar a conta
+          </p>
 
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="nome" className="text-white">
+              Nome
+            </Label>
+            <Input
+              id="nome"
+              type="text"
+              placeholder="Seu nome completo"
+              value={nome}
+              onChange={(e) => setNome(e.target.value)}
+              autoComplete="name"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="email" className="text-white">
+              Email
+            </Label>
             <Input
               id="email"
               type="email"
               placeholder="seu@email.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="senha">Senha</Label>
+            <Label htmlFor="senha" className="text-white">
+              Senha
+            </Label>
             <Input
               id="senha"
               type="password"
               placeholder="••••••••"
               value={senha}
               onChange={(e) => setSenha(e.target.value)}
+              autoComplete="new-password"
             />
           </div>
 
