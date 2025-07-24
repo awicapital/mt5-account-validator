@@ -40,7 +40,7 @@ export default function RegisterPage() {
 
     if (data.user) {
       const { error: updateError } = await supabase.auth.updateUser({
-        display_name: nome,
+        data: { nome }, // Atualiza o nome no user_metadata
       });
 
       if (updateError) {
