@@ -3,10 +3,12 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
+import Skeleton from "react-loading-skeleton";
+import "react-loading-skeleton/dist/skeleton.css";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
-import { AccountCard } from "@/components/ui/account-card"; // ✅ Novo import
+import { AccountCard } from "@/components/ui/account-card";
 
 type Account = {
   id: string;
@@ -54,9 +56,31 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="animate-spin w-6 h-6" />
-      </div>
+      <main className="min-h-screen p-6 bg-slate-100">
+        <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[...Array(3)].map((_, i) => (
+            <Card key={i}>
+              <CardContent className="p-6">
+                <Skeleton height={20} width={120} className="mb-2" />
+                <Skeleton height={30} width={80} />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[...Array(6)].map((_, i) => (
+            <Card key={i}>
+              <CardContent className="p-6">
+                <Skeleton height={24} width="100%" className="mb-2" />
+                <Skeleton height={16} width="60%" />
+                <Skeleton height={16} width="80%" />
+                <Skeleton height={16} width="40%" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </main>
     );
   }
 
@@ -92,39 +116,31 @@ export default function DashboardPage() {
 
   return (
     <main className="min-h-screen p-6 bg-slate-100">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-semibold">Minhas Contas</h2>
-        <Button onClick={() => router.push("/account-request")}>
-          Adicionar nova conta
-        </Button>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <Card>
+      {/* Painel resumo com 2 cards */}
+      <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <Card className="hover:shadow-lg transition-shadow cursor-default">
           <CardContent className="p-6">
-            <div className="text-muted-foreground text-sm mb-1">
-              Contas Ativas
-            </div>
-            <div className="text-3xl font-bold text-green-600">
-              {activeAccounts.length}
-            </div>
+            <div className="text-muted-foreground text-sm mb-1">Contas Ativas</div>
+            <div className="text-3xl font-bold text-green-600">{activeAccounts.length}</div>
           </CardContent>
         </Card>
-        <Card>
+
+        <Card className="hover:shadow-lg transition-shadow cursor-default">
           <CardContent className="p-6">
-            <div className="text-muted-foreground text-sm mb-1">
-              Contas Pendentes
-            </div>
-            <div className="text-3xl font-bold text-yellow-500">
-              {pendingAccounts.length}
-            </div>
+            <div className="text-muted-foreground text-sm mb-1">Contas Pendentes</div>
+            <div className="text-3xl font-bold text-yellow-500">{pendingAccounts.length}</div>
           </CardContent>
         </Card>
       </div>
 
+      {/* Lista de contas */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {accounts.map((account) => (
-          <AccountCard key={account.id} account={account} />
+          <AccountCard
+            key={account.id}
+            account={account}
+            className="hover:shadow-lg transition-shadow cursor-pointer"
+          />
         ))}
       </div>
     </main>

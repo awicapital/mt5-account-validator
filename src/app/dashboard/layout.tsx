@@ -1,11 +1,21 @@
+import { ReactNode } from "react";
 import { Sidebar } from "@/components/ui/sidebar";
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+interface DashboardLayoutProps {
+  children: ReactNode;
+}
+
+export default function DashboardLayout({ children }: DashboardLayoutProps) {
   return (
-    <div className="flex h-screen">
+    <div className="flex min-h-screen bg-background">
       <Sidebar />
-      <div className="flex-1 overflow-auto bg-slate-100">
-        {children}
+
+      <div className="flex flex-col flex-1">
+        <header className="h-16 bg-white shadow flex items-center px-6">
+          <h1 className="text-lg font-bold">Dashboard</h1>
+        </header>
+
+        <main className="flex-1 p-6 bg-background">{children}</main>
       </div>
     </div>
   );
