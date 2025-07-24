@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -46,11 +47,27 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-slate-100 px-4">
-      <Card className="w-full max-w-sm shadow-lg">
+    <main className="min-h-screen flex items-center justify-center bg-card px-4">
+      <Card className="w-full max-w-sm border-0 shadow-none">
         <CardContent className="p-6 space-y-6">
-          <h1 className="text-2xl font-semibold text-center">Login</h1>
 
+          {/* Logo */}
+          <div className="flex justify-center mb-4">
+            <Image
+              src="/logo_extendida.png"
+              alt="Logo Awi Capital"
+              width={200}
+              height={60}
+              priority
+            />
+          </div>
+
+          {/* Chamada amigável abaixo da logo */}
+          <p className="text-center text-sm text-muted-foreground">
+            Entre na sua conta para continuar
+          </p>
+
+          {/* Formulário */}
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input
