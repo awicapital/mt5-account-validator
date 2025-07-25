@@ -1,5 +1,6 @@
 import { ReactNode } from "react";
 import { Sidebar } from "@/components/ui/sidebar";
+import { TopMenu } from "@/components/ui/top-menu"; // importe o seu TopMenu
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -11,11 +12,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       <Sidebar />
 
       <div className="flex flex-col flex-1">
-        <header className="h-16 bg-white shadow flex items-center px-6">
-          <h1 className="text-lg font-bold">Dashboard</h1>
+        <header className="h-16 bg-[#03182f] flex items-center px-6">
+          <TopMenu />
         </header>
 
-        <main className="flex-1 p-6 bg-background">{children}</main>
+        <main className="flex-1 p-6 bg-[#03182f]">{children}</main>
       </div>
     </div>
   );
