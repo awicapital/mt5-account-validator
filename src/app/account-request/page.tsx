@@ -50,15 +50,21 @@ export default function AccountRequestPage() {
   };
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-slate-100 px-4">
-      <Card className="w-full max-w-md shadow-lg">
+    <main className="min-h-screen flex items-center justify-center bg-[#b6d5ff] px-4">
+      <Card className="w-full max-w-sm rounded-lg border-none shadow-lg bg-[#03182f]">
         <CardContent className="p-6 space-y-6">
-          <h1 className="text-2xl font-semibold text-center">
+          <h1 className="text-2xl font-semibold text-center text-white">
             Solicitar Nova Conta
           </h1>
 
+          <p className="text-center text-sm text-muted-foreground -mt-2 mb-4">
+            Preencha os dados abaixo
+          </p>
+
           <div className="space-y-2">
-            <Label htmlFor="account">Número da Conta MT5</Label>
+            <Label htmlFor="account" className="text-white">
+              Número da Conta MT5
+            </Label>
             <Input
               id="account"
               type="number"
@@ -68,7 +74,7 @@ export default function AccountRequestPage() {
             />
           </div>
 
-          <Button className="w-full" onClick={handleSubmit} disabled={loading}>
+          <Button className="w-full mt-2" onClick={handleSubmit} disabled={loading}>
             {loading ? "Enviando..." : "Enviar Solicitação"}
           </Button>
         </CardContent>
