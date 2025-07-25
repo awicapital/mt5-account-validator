@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Chat } from "lucide-react";
+import { MessageCircle } from "lucide-react";
 
 type OpenGptButtonProps = {
   /** URL do seu Custom GPT (ex: https://chat.openai.com/g/... ) */
@@ -22,7 +22,7 @@ export function OpenGptButton({ href, label = "Abrir GPT", className = "" }: Ope
           `bg-[#03182f] hover:bg-[#268bff] text-white ${className}`
         }
       >
-        <Chat className="w-5 h-5 text-white group-hover:text-white" />
+        <MessageCircle className="w-5 h-5 text-white group-hover:text-white" />
         <span className="text-sm font-medium">{label}</span>
       </button>
     </Link>
