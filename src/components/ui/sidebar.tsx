@@ -3,13 +3,12 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import {
   Home,
   BarChart2,
   MessageCircle,
-  Layers,
-  CreditCard,
   Settings,
   HelpCircle,
   LogOut,
@@ -24,33 +23,33 @@ const categories = [
     title: "MAIN MENU",
     items: [
       { label: "Dashboard", icon: Home, href: "/dashboard" },
-      { label: "Analytics", icon: BarChart2, href: "/dashboard/analytics" },
+      { label: "Analytics", icon: BarChart2, href: "/analytics" },
     ],
   },
   {
     title: "FEATURES",
     items: [
-      { label: "Discord", icon: MessageCircle, href: "/dashboard/discord" },
-      { label: "Hedge Calculator", icon: Cpu, href: "/dashboard/hedge-calculator" },
+      { label: "Discord", icon: MessageCircle, href: "/features/discord" },
+      { label: "Hedge Calculator", icon: Cpu, href: "/features/hedge-calculator" },
     ],
   },
   {
     title: "COURSES",
-    items: [{ label: "PRO", icon: BookOpen, href: "/dashboard/pro" }],
+    items: [{ label: "PRO", icon: BookOpen, href: "/courses/pro" }],
   },
   {
     title: "AGENTS",
     items: [
-      { label: "Backtester AI", icon: Activity, href: "/dashboard/backtester-ai" },
-      { label: "Premarket AI", icon: Activity, href: "/dashboard/premarket-ai" },
-      { label: "Apollo AI", icon: Activity, href: "/dashboard/apollo-ai" },
+      { label: "Backtester AI", icon: Activity, href: "/agents/backtester-ai" },
+      { label: "Premarket AI", icon: Activity, href: "/agents/premarket-ai" },
+      { label: "Apollo AI", icon: Activity, href: "/agents/apollo-ai" },
     ],
   },
   {
     title: "GENERAL",
     items: [
-      { label: "Settings", icon: Settings, href: "/dashboard/settings" },
-      { label: "Help Desk", icon: HelpCircle, href: "/dashboard/help" },
+      { label: "Settings", icon: Settings, href: "/general/settings" },
+      { label: "Help Desk", icon: HelpCircle, href: "/general/help-desk" },
       { label: "Log out", icon: LogOut, href: "/logout" },
     ],
   },
@@ -59,6 +58,13 @@ const categories = [
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
+  const supabase = createClientComponentClient();
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push("/login");
+  };
 
   return (
     <aside
@@ -76,7 +82,6 @@ export function Sidebar() {
         className="flex items-center justify-between px-4 py-3 border-b"
         style={{ borderColor: "#0b1320" }}
       >
-        {/* Logo clicável para expandir */}
         <div
           onClick={() => collapsed && setCollapsed(false)}
           className="flex items-center justify-center cursor-pointer"
@@ -107,16 +112,12 @@ export function Sidebar() {
           )}
         </div>
 
-        {/* Botão para colapsar - só aparece no expandido */}
         {!collapsed && (
           <button
             aria-label="Collapse sidebar"
             onClick={() => setCollapsed(true)}
             className="p-1 rounded cursor-pointer"
-            style={{
-              color: "white",
-              transition: "color 0.2s ease",
-            }}
+            style={{ color: "white", transition: "color 0.2s ease" }}
             onMouseEnter={(e) => (e.currentTarget.style.color = "#268bff")}
             onMouseLeave={(e) => (e.currentTarget.style.color = "white")}
           >
@@ -125,7 +126,7 @@ export function Sidebar() {
         )}
       </div>
 
-      {/* Menu de navegação */}
+      {/* Navegação */}
       <nav className="flex-1 overflow-y-auto px-1 py-4 scrollbar-thin scrollbar-thumb-[#268bff]/60 scrollbar-track-transparent">
         {categories.map((category) => (
           <div key={category.title} className="mb-6">
@@ -137,31 +138,49 @@ export function Sidebar() {
             <ul>
               {category.items.map(({ label, icon: Icon, href }) => {
                 const isActive = pathname === href;
+                const isLogout = label === "Log out";
+
                 return (
                   <li key={label}>
-                    <Link
-                      href={href}
-                      className={`group flex items-center ${
-                        collapsed ? "justify-center px-0" : "px-3"
-                      } py-2 rounded-md text-sm font-medium cursor-pointer ${
-                        isActive
-                          ? "bg-[#268bff] font-semibold text-white"
-                          : "text-white/80"
-                      } hover:text-[#268bff]`}
-                    >
-                      <Icon
-                        className={`w-5 h-5 ${
+                    {isLogout ? (
+                      <button
+                        onClick={handleLogout}
+                        className={`group flex items-center ${
+                          collapsed ? "justify-center px-0" : "px-3"
+                        } py-2 rounded-md text-sm font-medium cursor-pointer text-white/80 hover:text-[#268bff] w-full`}
+                      >
+                        <Icon className="w-5 h-5 text-white/80 group-hover:text-[#268bff]" />
+                        {!collapsed && (
+                          <span className="ml-3 group-hover:text-[#268bff]">
+                            {label}
+                          </span>
+                        )}
+                      </button>
+                    ) : (
+                      <Link
+                        href={href}
+                        className={`group flex items-center ${
+                          collapsed ? "justify-center px-0" : "px-3"
+                        } py-2 rounded-md text-sm font-medium cursor-pointer ${
                           isActive
-                            ? "text-white"
-                            : "text-white/80 group-hover:text-[#268bff]"
-                        }`}
-                      />
-                      {!collapsed && (
-                        <span className="ml-3 group-hover:text-[#268bff]">
-                          {label}
-                        </span>
-                      )}
-                    </Link>
+                            ? "font-semibold text-[#268bff]"
+                            : "text-white/80"
+                        } hover:text-[#268bff]`}
+                      >
+                        <Icon
+                          className={`w-5 h-5 ${
+                            isActive
+                              ? "text-[#268bff]"
+                              : "text-white/80 group-hover:text-[#268bff]"
+                          }`}
+                        />
+                        {!collapsed && (
+                          <span className="ml-3 group-hover:text-[#268bff]">
+                            {label}
+                          </span>
+                        )}
+                      </Link>
+                    )}
                   </li>
                 );
               })}
@@ -169,27 +188,6 @@ export function Sidebar() {
           </div>
         ))}
       </nav>
-
-      {/* Box Upgrade Pro */}
-      {!collapsed && (
-        <div
-          className="p-4 rounded-md shadow-inner mx-3 mb-4 text-center text-xs font-semibold select-none"
-          style={{ backgroundColor: "#268bff", color: "white" }}
-        >
-          Upgrade Pro! 🔥
-          <div className="mt-1 text-xs text-white/80">
-            Higher productivity with better organization
-          </div>
-          <div className="mt-2 flex justify-center gap-2">
-            <button className="bg-white text-[#268bff] px-3 py-1 rounded hover:bg-gray-100 cursor-pointer">
-              Upgrade
-            </button>
-            <button className="underline text-white text-xs cursor-pointer">
-              Learn more
-            </button>
-          </div>
-        </div>
-      )}
     </aside>
   );
 }
