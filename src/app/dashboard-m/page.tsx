@@ -1,11 +1,12 @@
 "use client";
 
-// src/app/dashboard-m/page.tsx
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Loader2 } from "lucide-react";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Loader2, Plus, Server, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useSwipeable } from "react-swipeable";
 import { supabase } from "@/lib/supabase";
 
 type Account = {
@@ -16,10 +17,50 @@ type Account = {
   is_active: boolean;
 };
 
+function AccountCard({ account, onSwipe }: { account: Account; onSwipe: () => void }) {
+  const swipeHandlers = useSwipeable({
+    onSwipedRight: onSwipe,
+    preventScrollOnSwipe: true,
+    trackMouse: true,
+  });
+
+  return (
+    <div {...swipeHandlers} className="overflow-hidden rounded-xl">
+      <Card className="bg-[#131f35] border border-[#1f2c44] text-white">
+        <CardContent className="flex items-center justify-between p-4 space-x-4">
+          <div className="bg-[#1e2b45] p-2 rounded-lg">
+            <Server className="w-6 h-6 text-white" />
+          </div>
+
+          <div className="flex-1">
+            <div className="text-sm font-medium">
+              #{account.account_number} — {account.ea_name || "Sem EA"}
+            </div>
+            <div
+              className={`text-xs font-semibold mt-1 ${account.is_active ? "text-green-400" : "text-yellow-400"}`}
+            >
+              {account.is_active ? "Ativa" : "Pendente"}
+            </div>
+          </div>
+
+          <div className="text-right">
+            <div className="text-sm font-semibold">
+              $ {account.balance?.toFixed(2) || "—"}
+            </div>
+            <div className="text-xs text-muted-foreground">Saldo</div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export default function MobileDashboardPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   useEffect(() => {
     const fetchAccounts = async () => {
@@ -39,6 +80,14 @@ export default function MobileDashboardPage() {
     fetchAccounts();
   }, [router]);
 
+  const handleDelete = async () => {
+    if (!selectedAccount) return;
+    await supabase.from("accounts").delete().eq("id", selectedAccount.id);
+    setAccounts((prev) => prev.filter((a) => a.id !== selectedAccount.id));
+    setDialogOpen(false);
+    setSelectedAccount(null);
+  };
+
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center">
@@ -49,7 +98,7 @@ export default function MobileDashboardPage() {
 
   if (accounts.length === 0) {
     return (
-      <div className="h-full flex flex-col items-center justify-center text-center px-4">
+      <div className="h-full flex flex-col items-center justify-center text-center px-4 bg-[#03182f]">
         <h2 className="text-xl font-semibold text-white mb-2">Nenhuma conta encontrada</h2>
         <p className="text-sm text-muted-foreground mb-4">
           Você ainda não possui nenhuma conta MT5 registrada.
@@ -60,11 +109,8 @@ export default function MobileDashboardPage() {
   }
 
   return (
-    <div className="p-4 space-y-6 bg-[#03182f] min-h-screen">
-      <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold">Minhas Contas</h1>
-        <Button size="sm" onClick={() => router.push("/account-request")}>Nova</Button>
-      </div>
+    <div className="p-4 space-y-6 bg-[#03182f] min-h-screen pb-24 relative">
+      <h1 className="text-lg font-semibold text-white">Minhas Contas</h1>
 
       <div className="grid grid-cols-2 gap-4">
         <Card className="bg-zinc-900 border-none">
@@ -87,19 +133,43 @@ export default function MobileDashboardPage() {
 
       <div className="space-y-4">
         {accounts.map((account) => (
-          <Card key={account.id} className="bg-zinc-800 border-none text-white">
-            <CardContent className="p-4 space-y-2">
-              <div className="text-sm font-medium">
-                #{account.account_number} — {account.ea_name || "Sem EA"}
-              </div>
-              <div className="text-sm">Saldo: $ {account.balance?.toFixed(2) || "—"}</div>
-              <span className={`text-xs px-2 py-1 rounded-full font-medium ${account.is_active ? "bg-green-500" : "bg-yellow-500"}`}>
-                {account.is_active ? "Ativa" : "Pendente"}
-              </span>
-            </CardContent>
-          </Card>
+          <AccountCard
+            key={account.id}
+            account={account}
+            onSwipe={() => {
+              setSelectedAccount(account);
+              setDialogOpen(true);
+            }}
+          />
         ))}
       </div>
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="bg-[#1a2236] border border-zinc-700 text-white">
+          <DialogHeader>
+            <DialogTitle>Deseja excluir esta conta?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Esta ação não poderá ser desfeita.
+          </p>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={handleDelete}>
+              <Trash2 className="w-4 h-4 mr-2" /> Excluir
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <button
+        className="fixed z-50 bottom-24 right-6 bg-[#268bff] hover:bg-[#1e78e0] text-white rounded-full p-4 shadow-lg"
+        onClick={() => router.push("/account-request")}
+        aria-label="Solicitar nova conta"
+      >
+        <Plus className="w-5 h-5" />
+      </button>
     </div>
   );
 }
