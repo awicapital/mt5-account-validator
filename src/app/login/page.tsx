@@ -39,7 +39,9 @@ export default function LoginPage() {
       if (email === "contato@awi.capital") {
         router.push("/admin/dashboard");
       } else {
-        router.push("/dashboard");
+        const isMobile =
+          typeof window !== "undefined" && window.innerWidth < 768;
+        router.push(isMobile ? "/dashboard-m" : "/dashboard");
       }
     }
 
@@ -50,7 +52,6 @@ export default function LoginPage() {
     <main className="min-h-screen flex items-center justify-center bg-card px-4">
       <Card className="w-full max-w-sm border-0 shadow-none">
         <CardContent className="p-6 space-y-6">
-
           {/* Logo */}
           <div className="flex justify-center mb-4">
             <Image
