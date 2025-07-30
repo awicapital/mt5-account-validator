@@ -8,8 +8,16 @@ import { cn } from "@/lib/utils"
 const Dialog = DialogPrimitive.Root
 const DialogTrigger = DialogPrimitive.Trigger
 
-const DialogPortal = ({ children }: { children: React.ReactNode }) => (
-  <DialogPrimitive.Portal>{children}</DialogPrimitive.Portal>
+const DialogPortal = ({
+  className,
+  children,
+}: {
+  className?: string
+  children: React.ReactNode
+}) => (
+  <DialogPrimitive.Portal>
+    <div className={cn(className)}>{children}</div>
+  </DialogPrimitive.Portal>
 )
 DialogPortal.displayName = DialogPrimitive.Portal.displayName
 
