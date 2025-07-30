@@ -191,7 +191,7 @@ export default function UserProfilePage() {
 
       <Card className="bg-[#1f2c44] border-none">
         <CardContent className="p-4 text-white text-sm rounded-xl">
-          ---
+          {/* Comentário válido */}
         </CardContent>
       </Card>
 
