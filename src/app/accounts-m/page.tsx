@@ -51,7 +51,9 @@ function AccountCard({ account, showBalance, onDelete }: { account: Account; sho
             <div className="text-sm font-medium">
               #{account.account_number} — {account.ea_name || "Sem EA"}
             </div>
-            <div className={`text-xs font-semibold mt-1 ${account.is_active ? "text-green-400" : "text-yellow-400"}`}>{account.is_active ? "Ativa" : "Pendente"}</div>
+            <div className={`text-xs font-semibold mt-1 ${account.is_active ? "text-green-400" : "text-yellow-400"}`}>
+              {account.is_active ? "Ativa" : "Pendente"}
+            </div>
           </div>
           <div className="text-right">
             <div className="text-sm font-semibold">
@@ -190,38 +192,38 @@ export default function AccountsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-//
+
       <Dialog open={requestDialogOpen} onOpenChange={setRequestDialogOpen}>
-  <DialogContent className="bg-[#131f35] border border-[#1f2c44]">
-    <DialogHeader>
-      <DialogTitle className="text-xl font-semibold text-center text-white">
-        Solicitar nova conta
-      </DialogTitle>
-    </DialogHeader>
-    <p className="text-sm text-muted-foreground text-center mt-1 mb-5">
-      Informe o número da conta MT5 que deseja vincular.
-    </p>
-    <div className="space-y-2">
-      <input
-        type="number"
-        placeholder="Ex: 123456"
-        value={accountNumber}
-        onChange={(e) => setAccountNumber(e.target.value)}
-        className="w-full px-3 py-2 rounded-md bg-[#1f2c44] text-white placeholder:text-[#94a3b8] focus:outline-none focus:ring-2 focus:ring-[#268bff]"
-      />
-    </div>
-    <DialogFooter className="flex justify-center mt-6">
-      <Button
-        className="bg-[#268bff] hover:bg-[#1e78e0] text-white w-full"
-        onClick={handleSubmit}
-        disabled={submitting}
-      >
-        <Plus className="w-4 h-4 mr-2" />
-        {submitting ? "Enviando..." : "Enviar Solicitação"}
-      </Button>
-    </DialogFooter>
-  </DialogContent>
-</Dialog>
+        <DialogContent className="bg-[#131f35] border border-[#1f2c44]">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-semibold text-center text-white">
+              Solicitar nova conta
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground text-center mt-1 mb-5">
+            Informe o número da conta MT5 que deseja vincular.
+          </p>
+          <div className="space-y-2">
+            <input
+              type="number"
+              placeholder="Ex: 123456"
+              value={accountNumber}
+              onChange={(e) => setAccountNumber(e.target.value)}
+              className="w-full bg-[#1f2c44] text-white border border-[#2c3a55] rounded-md px-3 py-2 placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#268bff]"
+            />
+          </div>
+          <DialogFooter className="flex justify-center mt-6">
+            <Button
+              className="bg-[#268bff] hover:bg-[#1e78e0] text-white w-full"
+              onClick={handleSubmit}
+              disabled={submitting}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              {submitting ? "Enviando..." : "Enviar Solicitação"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
