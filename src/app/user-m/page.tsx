@@ -103,12 +103,14 @@ export default function UserProfilePage() {
       }
 
       const { data: publicUrlData } = supabase.storage.from("avatars").getPublicUrl(filePath);
-      if (!publicUrlData?.publicUrl) {
+      const publicUrl = publicUrlData.publicUrl;
+
+      if (!publicUrl) {
         console.error("Erro ao obter URL pública");
         return toast.error("Erro ao obter URL da imagem");
       }
 
-      const { error: updateError } = await supabase.from("users").update({ avatar_url: publicUrlData.publicUrl }).eq("id", user.id);
+      const { error: updateError } = await supabase.from("users").update({ avatar_url: publicUrl }).eq("id", user.id);
       if (updateError) {
         console.error("Erro ao atualizar avatar no banco:", updateError);
         return toast.error("Erro ao atualizar avatar");
