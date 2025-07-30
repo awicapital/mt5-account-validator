@@ -1,14 +1,14 @@
 "use client";
 
-import { Home, List, TrendingUp, LifeBuoy } from "lucide-react";
+import { Home, List, Bot, HelpCircle } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import clsx from "clsx";
 
 const navItems = [
   { label: "Início", href: "/dashboard-m", icon: Home },
   { label: "Contas", href: "/accounts-m", icon: List },
-  { label: "Negociar", href: "/analytics-m", icon: TrendingUp },
-  { label: "Cartão", href: "/help-desk-m", icon: LifeBuoy },
+  { label: "IA", href: "/agents-m", icon: Bot },
+  { label: "Ajuda", href: "/help-desk-m", icon: HelpCircle },
 ];
 
 export default function MobileNav() {
