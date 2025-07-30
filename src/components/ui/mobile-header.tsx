@@ -47,7 +47,7 @@ export default function MobileHeader() {
           if (full_name) {
             const initials = full_name
               .split(" ")
-              .map((n) => n[0])
+              .map((n: string) => n[0])
               .join("")
               .slice(0, 2)
               .toUpperCase();
@@ -84,17 +84,18 @@ export default function MobileHeader() {
           <Bell className="w-5 h-5 cursor-pointer" />
           <span className="absolute -top-1 -right-1 bg-red-500 w-2 h-2 rounded-full" />
         </div>
+
         <div
           onClick={handleAvatarClick}
           className="w-6 h-6 rounded-full bg-[#268bff] text-white text-xs font-bold flex items-center justify-center overflow-hidden cursor-pointer"
         >
           {avatarUrl ? (
-            <img
+            <Image
               src={avatarUrl}
               alt="Avatar"
               width={24}
               height={24}
-              className="rounded-full object-cover w-full h-full"
+              className="rounded-full object-cover"
             />
           ) : (
             <span>{userInitials}</span>
