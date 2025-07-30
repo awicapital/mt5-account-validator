@@ -98,13 +98,13 @@ export default function UserProfilePage() {
         upsert: true
       });
       if (uploadError || !uploadData) {
-    		console.error("Erro no upload:", uploadError?.message || uploadError);
-    		return toast.error(`Erro ao enviar imagem: ${uploadError?.message || "erro desconhecido"}`);
-    	}
+        console.error("Erro no upload:", uploadError?.message || uploadError);
+        return toast.error(`Erro ao enviar imagem: ${uploadError?.message || "erro desconhecido"}`);
+      }
 
-      const { data: publicUrlData, error: urlError } = supabase.storage.from("avatars").getPublicUrl(filePath);
-      if (urlError || !publicUrlData?.publicUrl) {
-        console.error("Erro ao obter URL pública:", urlError);
+      const { data: publicUrlData } = supabase.storage.from("avatars").getPublicUrl(filePath);
+      if (!publicUrlData?.publicUrl) {
+        console.error("Erro ao obter URL pública");
         return toast.error("Erro ao obter URL da imagem");
       }
 
