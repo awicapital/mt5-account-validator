@@ -25,6 +25,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: "Conta não encontrada" }, { status: 404 });
     }
 
+    // Usa a data enviada ou a atual (caso não enviada)
     const logDate = date || new Date().toISOString().split("T")[0];
 
     const { error: upsertError } = await supabase
@@ -35,7 +36,7 @@ export async function POST(req: Request) {
         end_balance: balance,
         pnl: pnl,
       }], {
-        onConflict: ['account_id', 'date']
+        onConflict: 'account_id,date'
       });
 
     if (upsertError) {
