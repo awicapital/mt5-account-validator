@@ -24,6 +24,7 @@ function AccountCard({ account, showBalance, onDelete }: { account: Account; sho
   const x = useMotionValue(0);
   const controls = useAnimation();
   const bgColor = useTransform(x, [-100, 0], ["#7f1d1d", "#131f35"]);
+  const router = useRouter();
 
   const swipeHandlers = useSwipeable({
     onSwiping: (e) => {
@@ -40,8 +41,16 @@ function AccountCard({ account, showBalance, onDelete }: { account: Account; sho
     trackMouse: true,
   });
 
+  const goToDetails = () => router.push(`/accounts-details-m/${account.account_number}`);
+
   return (
-    <motion.div {...swipeHandlers} animate={controls} style={{ x, backgroundColor: bgColor }} className="overflow-hidden rounded-xl">
+    <motion.div
+      {...swipeHandlers}
+      animate={controls}
+      style={{ x, backgroundColor: bgColor }}
+      className="overflow-hidden rounded-xl cursor-pointer"
+      onClick={goToDetails}
+    >
       <Card className="bg-transparent border border-[#1f2c44] text-white">
         <CardContent className="flex items-center justify-between p-4 space-x-4">
           <div className="bg-[#1e2b45] p-2 rounded-lg">
