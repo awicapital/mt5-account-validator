@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/card'
-import { Loader2, DollarSign, TrendingUp, Percent, ArrowLeft, LucideIcon } from 'lucide-react'
+import { Loader2, DollarSign, TrendingUp, ArrowLeft, LucideIcon } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import {
   LineChart,
@@ -87,7 +87,17 @@ export default function AccountDetailsPage() {
   const pnlTotal = logs.reduce((sum, l) => sum + l.pnl, 0)
   const firstBalance = logs[0]?.end_balance || 0
   const lastBalance = logs[logs.length - 1]?.end_balance || account.balance
-  const pnlPercent = firstBalance > 0 ? ((lastBalance - firstBalance) / firstBalance) * 100 : 0
+
+  const pnlColorClass =
+    pnlTotal > 0 ? 'text-green-400' : pnlTotal < 0 ? 'text-red-400' : 'text-muted-foreground'
+
+ const filteredLogs = logs.filter((log) => log.pnl !== 0)
+
+const cumulativeLogs = filteredLogs.reduce((acc, log, i) => {
+  const cumulativePnl = (acc[i - 1]?.pnl || 0) + log.pnl
+  acc.push({ ...log, pnl: cumulativePnl })
+  return acc
+}, [] as Log[])
 
   const Stat = ({
     icon: Icon,
@@ -96,7 +106,7 @@ export default function AccountDetailsPage() {
   }: {
     icon: LucideIcon
     label: string
-    value: string
+    value: string | JSX.Element
   }) => (
     <div className="flex items-start gap-3">
       <div className="p-2 rounded-md bg-[#1e2c46]">
@@ -131,50 +141,40 @@ export default function AccountDetailsPage() {
       </div>
 
       <Card className="bg-[#0f1d31] border border-[#1e2c46] shadow-md rounded-2xl">
-        <CardContent className="grid grid-cols-1 sm:grid-cols-3 gap-6 p-6">
+        <CardContent className="flex items-start justify-between px-4 py-6">
           <Stat icon={DollarSign} label="Saldo atual" value={`$${account.balance.toFixed(2)}`} />
-          <Stat icon={TrendingUp} label="PnL total" value={`$${pnlTotal.toFixed(2)}`} />
-          <Stat icon={Percent} label="% crescimento" value={`${pnlPercent.toFixed(2)}%`} />
+          <Stat icon={TrendingUp} label="PnL total" value={<span className={pnlColorClass}>${pnlTotal.toFixed(2)}</span>} />
         </CardContent>
       </Card>
 
       <div className="rounded-2xl bg-[#0f1d31] shadow-md p-6 border border-[#1e2c46]">
         <h2 className="text-white font-semibold text-base mb-4">Evolução do PnL</h2>
         <ResponsiveContainer width="100%" height={300}>
-          <LineChart data={logs} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
-            <CartesianGrid stroke="#1e2c46" strokeDasharray="3 3" />
-            <XAxis
-              dataKey="date"
-              stroke="#94a3b8"
-              fontSize={12}
-              tickLine={false}
-              axisLine={false}
-            />
+          <LineChart data={cumulativeLogs} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
+            <CartesianGrid stroke="#1e2c46" strokeDasharray="3 3" vertical={false} />
+            <XAxis hide />
             <YAxis
               stroke="#1f2c44"
               fontSize={12}
               tickLine={false}
               axisLine={false}
               domain={['dataMin - 2000', 'dataMax + 2000']}
-            />
-            <ReferenceLine
-              y={0}
-              stroke="#ffffff"
-              strokeWidth={1.5}
-              strokeDasharray="4 4"
+              tickFormatter={(value) => {
+                const abs = Math.abs(value)
+                return abs >= 1000 ? `$${(value / 1000).toFixed(1)}K` : `$${value.toFixed(0)}`
+              }}
             />
             <Tooltip
               content={({ active, payload, label }) => {
                 if (!active || !payload || payload.length === 0) return null
                 const log = payload[0].payload as Log
+                const colorClass = log.pnl >= 0 ? 'text-green-400' : 'text-red-400'
+
                 return (
                   <div className="bg-[#1f2c44] text-white p-3 rounded-md shadow">
                     <div className="text-sm font-medium">{label}</div>
-                    <div className="text-xs text-muted-foreground">
-                      PnL:{' '}
-                      <span className={log.pnl >= 0 ? 'text-green-400' : 'text-red-400'}>
-                        ${log.pnl.toFixed(2)}
-                      </span>
+                    <div className={`text-xs font-medium ${colorClass}`}>
+                      PnL acumulado: ${log.pnl.toFixed(2)}
                     </div>
                     <div className="text-xs text-muted-foreground">
                       Saldo: ${log.end_balance.toFixed(2)}
@@ -188,8 +188,8 @@ export default function AccountDetailsPage() {
               dataKey="pnl"
               stroke="#3b82f6"
               strokeWidth={2.5}
-              dot={{ r: 3, stroke: '#fff', strokeWidth: 1, fill: '#3b82f6' }}
-              activeDot={{ r: 6, fill: '#fff', stroke: '#3b82f6', strokeWidth: 2 }}
+              dot={false}
+              activeDot={false}
               animationDuration={500}
             />
           </LineChart>
@@ -200,17 +200,17 @@ export default function AccountDetailsPage() {
         <div className="px-6 pt-6 pb-2">
           <h3 className="text-white font-semibold text-base">Histórico Diário</h3>
         </div>
-        <CardContent className="pt-0 pb-6 px-6 overflow-x-auto">
+        <CardContent className="pt-0 pb-6 px-6 max-h-64 overflow-y-auto">
           <table className="w-full text-sm text-left">
             <thead>
-              <tr className="text-muted-foreground border-b border-[#1f2c44]">
+              <tr className="text-muted-foreground border-b border-[#1f2c44] sticky top-0 bg-[#0f1d31] z-10">
                 <th className="py-2">Data</th>
                 <th className="py-2 text-right">PnL</th>
                 <th className="py-2 text-right">Saldo</th>
               </tr>
             </thead>
             <tbody>
-              {logs.map((log) => (
+              {[...logs].reverse().filter(log => log.pnl !== 0).map((log) => (
                 <tr key={log.date} className="border-t border-[#1f2c44] hover:bg-[#131f35] transition-colors">
                   <td className="py-2 text-white font-medium">{log.date}</td>
                   <td
