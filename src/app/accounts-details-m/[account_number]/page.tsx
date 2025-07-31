@@ -85,7 +85,6 @@ export default function AccountDetailsPage() {
   }
 
   const pnlTotal = logs.reduce((sum, l) => sum + l.pnl, 0)
-  const diasOperados = logs.length
   const firstBalance = logs[0]?.end_balance || 0
   const lastBalance = logs[logs.length - 1]?.end_balance || account.balance
   const pnlPercent = firstBalance > 0 ? ((lastBalance - firstBalance) / firstBalance) * 100 : 0
@@ -109,9 +108,6 @@ export default function AccountDetailsPage() {
       </div>
     </div>
   )
-
-  const logsPositive = logs.map(log => ({ ...log, pnl: log.pnl >= 0 ? log.pnl : null }))
-  const logsNegative = logs.map(log => ({ ...log, pnl: log.pnl < 0 ? log.pnl : null }))
 
   return (
     <div className="p-6 bg-[#03182f] min-h-dvh pb-32 space-y-10">
@@ -145,44 +141,55 @@ export default function AccountDetailsPage() {
       <div className="rounded-2xl bg-[#0f1d31] shadow-md p-6 border border-[#1e2c46]">
         <h2 className="text-white font-semibold text-base mb-4">Evolução do PnL</h2>
         <ResponsiveContainer width="100%" height={300}>
-          <LineChart
-            data={logs}
-            margin={{ top: 10, right: 20, left: -10, bottom: 0 }}
-          >
+          <LineChart data={logs} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
             <CartesianGrid stroke="#1e2c46" strokeDasharray="3 3" />
-            <XAxis dataKey="date" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-<YAxis
-  stroke="#1f2c44"
-  fontSize={12}
-  tickLine={false}
-  axisLine={false}
-  allowDataOverflow={true}
-  domain={[-Math.max(...logs.map(l => Math.abs(l.pnl))) * 1.2, Math.max(...logs.map(l => Math.abs(l.pnl))) * 1.2]}
-  ticks={[0]}
-/>
-<ReferenceLine y={0} stroke="#1f2c44" strokeDasharray="3 3" strokeWidth={1} label={{ value: '0', position: 'insideLeft', fill: '#1f2c44', fontSize: 12 }} />
-
+            <XAxis
+              dataKey="date"
+              stroke="#94a3b8"
+              fontSize={12}
+              tickLine={false}
+              axisLine={false}
+            />
+            <YAxis
+              stroke="#1f2c44"
+              fontSize={12}
+              tickLine={false}
+              axisLine={false}
+              domain={['dataMin - 2000', 'dataMax + 2000']}
+            />
+            <ReferenceLine
+              y={0}
+              stroke="#ffffff"
+              strokeWidth={1.5}
+              strokeDasharray="4 4"
+            />
             <Tooltip
-              contentStyle={{ background: '#1f2c44', border: 'none', borderRadius: 8 }}
-              labelStyle={{ color: '#fff' }}
+              content={({ active, payload, label }) => {
+                if (!active || !payload || payload.length === 0) return null
+                const log = payload[0].payload as Log
+                return (
+                  <div className="bg-[#1f2c44] text-white p-3 rounded-md shadow">
+                    <div className="text-sm font-medium">{label}</div>
+                    <div className="text-xs text-muted-foreground">
+                      PnL:{' '}
+                      <span className={log.pnl >= 0 ? 'text-green-400' : 'text-red-400'}>
+                        ${log.pnl.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      Saldo: ${log.end_balance.toFixed(2)}
+                    </div>
+                  </div>
+                )
+              }}
             />
-            <ReferenceLine y={0} stroke="#ffffff" strokeWidth={1.5} strokeDasharray="4 4" />
             <Line
               type="monotone"
-              data={logsPositive}
               dataKey="pnl"
-              stroke="#22c55e"
+              stroke="#3b82f6"
               strokeWidth={2.5}
-              dot={false}
-              animationDuration={500}
-            />
-            <Line
-              type="monotone"
-              data={logsNegative}
-              dataKey="pnl"
-              stroke="#ef4444"
-              strokeWidth={2.5}
-              dot={false}
+              dot={{ r: 3, stroke: '#fff', strokeWidth: 1, fill: '#3b82f6' }}
+              activeDot={{ r: 6, fill: '#fff', stroke: '#3b82f6', strokeWidth: 2 }}
               animationDuration={500}
             />
           </LineChart>
