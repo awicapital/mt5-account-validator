@@ -12,9 +12,9 @@ import {
   YAxis,
   Tooltip,
   CartesianGrid,
-  ReferenceLine,
   ResponsiveContainer,
 } from 'recharts'
+import React from 'react'
 
 interface Log {
   date: string
@@ -85,19 +85,16 @@ export default function AccountDetailsPage() {
   }
 
   const pnlTotal = logs.reduce((sum, l) => sum + l.pnl, 0)
-  const firstBalance = logs[0]?.end_balance || 0
-  const lastBalance = logs[logs.length - 1]?.end_balance || account.balance
-
   const pnlColorClass =
     pnlTotal > 0 ? 'text-green-400' : pnlTotal < 0 ? 'text-red-400' : 'text-muted-foreground'
 
- const filteredLogs = logs.filter((log) => log.pnl !== 0)
+  const filteredLogs = logs.filter((log) => log.pnl !== 0)
 
-const cumulativeLogs = filteredLogs.reduce((acc, log, i) => {
-  const cumulativePnl = (acc[i - 1]?.pnl || 0) + log.pnl
-  acc.push({ ...log, pnl: cumulativePnl })
-  return acc
-}, [] as Log[])
+  const cumulativeLogs = filteredLogs.reduce((acc, log, i) => {
+    const cumulativePnl = (acc[i - 1]?.pnl || 0) + log.pnl
+    acc.push({ ...log, pnl: cumulativePnl })
+    return acc
+  }, [] as Log[])
 
   const Stat = ({
     icon: Icon,
@@ -106,7 +103,7 @@ const cumulativeLogs = filteredLogs.reduce((acc, log, i) => {
   }: {
     icon: LucideIcon
     label: string
-    value: string | JSX.Element
+    value: string | React.ReactNode
   }) => (
     <div className="flex items-start gap-3">
       <div className="p-2 rounded-md bg-[#1e2c46]">
