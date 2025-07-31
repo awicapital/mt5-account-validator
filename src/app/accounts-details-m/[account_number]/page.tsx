@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/card'
-import { Loader2, DollarSign, TrendingUp, Percent, ArrowLeft } from 'lucide-react'
+import { Loader2, DollarSign, TrendingUp, Percent, ArrowLeft, LucideIcon } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import {
   LineChart,
@@ -89,7 +89,15 @@ export default function AccountDetailsPage() {
   const lastBalance = logs[logs.length - 1]?.end_balance || account.balance
   const pnlPercent = firstBalance > 0 ? ((lastBalance - firstBalance) / firstBalance) * 100 : 0
 
-  const Stat = ({ icon: Icon, label, value }: { icon: any; label: string; value: string }) => (
+  const Stat = ({
+    icon: Icon,
+    label,
+    value,
+  }: {
+    icon: LucideIcon
+    label: string
+    value: string
+  }) => (
     <div className="flex items-start gap-3">
       <div className="p-2 rounded-md bg-[#1e2c46]">
         <Icon className="text-[#8CA3BA] w-5 h-5" />
