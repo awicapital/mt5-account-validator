@@ -5,13 +5,12 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
 
-    // ✅ Log completo de debug para inspecionar o `pnl`
     console.log("Payload recebido do MT5:", JSON.stringify(body));
     console.log("→ pnl:", body.pnl, "| Tipo de pnl:", typeof body.pnl);
 
-    const { account_number, balance, pnl } = body;
+    const { account_number, balance, pnl, date } = body;
 
-    if (!account_number || typeof balance !== "number") {
+    if (!account_number || typeof balance !== "number" || typeof pnl !== "number") {
       return NextResponse.json({ success: false, error: "Dados inválidos" }, { status: 400 });
     }
 
@@ -26,24 +25,25 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: "Conta não encontrada" }, { status: 404 });
     }
 
-    const today = new Date().toISOString().split("T")[0];
+    const logDate = date || new Date().toISOString().split("T")[0];
 
-    const { error: insertError } = await supabase
+    const { error: upsertError } = await supabase
       .from("account_daily_logs")
-      .insert([{
+      .upsert([{
         account_id: account.id,
-        date: today,
+        date: logDate,
         end_balance: balance,
         pnl: pnl,
-      }]);
+      }], {
+        onConflict: ['account_id', 'date']
+      });
 
-    if (insertError) {
-      console.error("Erro ao inserir:", insertError.message);
-      return NextResponse.json({ success: false, error: insertError.message }, { status: 500 });
+    if (upsertError) {
+      console.error("Erro ao inserir/atualizar:", upsertError.message);
+      return NextResponse.json({ success: false, error: upsertError.message }, { status: 500 });
     }
 
-    console.log("Insert realizado com sucesso");
-
+    console.log("Upsert realizado com sucesso para data:", logDate);
     return NextResponse.json({ success: true });
 
   } catch (error) {
