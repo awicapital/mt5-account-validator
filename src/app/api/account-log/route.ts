@@ -23,7 +23,7 @@ export async function POST(req: Request) {
     const parseForm = promisify(form.parse.bind(form));
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const [fields, files]: [any, any] = await parseForm(req as unknown as IncomingMessage);
+    const [fields, files] = await parseForm(req as unknown as IncomingMessage);
     const file = files.file?.[0];
 
     if (!file) {
