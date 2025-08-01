@@ -20,17 +20,19 @@ const supabase = createClient(
 export async function POST(req: Request) {
   try {
     const form = new IncomingForm({ keepExtensions: true, multiples: false });
-    const parseForm = promisify(form.parse.bind(form));
+    const parseForm = promisify<{ fields: Record<string, string[]>; files: Files }>(
+      form.parse.bind(form)
+    );
 
-    const { fields, files }: { fields: any; files: Files } = await parseForm(req as unknown as IncomingMessage);
-    const file = Array.isArray(files.file) ? files.file[0] : files.file;
+    const { files } = await parseForm(req as unknown as IncomingMessage);
+    const uploadedFile = Array.isArray(files.file) ? files.file[0] : files.file;
 
-    if (!file) {
+    if (!uploadedFile) {
       return NextResponse.json({ success: false, error: 'Arquivo CSV ausente' }, { status: 400 });
     }
 
-    const filePath = file.filepath;
-    const fileName = path.basename(file.originalFilename || filePath);
+    const filePath = uploadedFile.filepath;
+    const fileName = path.basename(uploadedFile.originalFilename || filePath);
 
     if (!fileName.endsWith('.csv')) {
       return NextResponse.json({ success: false, error: 'Tipo de arquivo inválido. Envie um .csv' }, { status: 400 });
