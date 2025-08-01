@@ -20,9 +20,10 @@ const supabase = createClient(
 export async function POST(req: Request) {
   try {
     const form = new IncomingForm({ keepExtensions: true, multiples: false });
-    const parseForm = promisify<{ fields: Record<string, string[]>; files: Files }>(
-      form.parse.bind(form)
-    );
+
+    const parseForm = promisify(form.parse.bind(form)) as (
+      req: IncomingMessage
+    ) => Promise<{ fields: Record<string, string[]>; files: Files }>;
 
     const { files } = await parseForm(req as unknown as IncomingMessage);
     const uploadedFile = Array.isArray(files.file) ? files.file[0] : files.file;
