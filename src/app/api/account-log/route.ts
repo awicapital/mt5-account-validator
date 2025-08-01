@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { IncomingForm, Files } from 'formidable';
-import { promisify } from 'util';
 import fs from 'fs';
 import path from 'path';
 import type { IncomingMessage } from 'http';
@@ -17,15 +16,19 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+function parseFormAsync(req: IncomingMessage): Promise<{ fields: Record<string, string[]>; files: Files }> {
+  return new Promise((resolve, reject) => {
+    const form = new IncomingForm({ keepExtensions: true, multiples: false });
+    form.parse(req, (err, fields, files) => {
+      if (err) return reject(err);
+      resolve({ fields, files });
+    });
+  });
+}
+
 export async function POST(req: Request) {
   try {
-    const form = new IncomingForm({ keepExtensions: true, multiples: false });
-
-    const parseForm = promisify(form.parse.bind(form)) as (
-      req: IncomingMessage
-    ) => Promise<{ fields: Record<string, string[]>; files: Files }>;
-
-    const { files } = await parseForm(req as unknown as IncomingMessage);
+    const { files } = await parseFormAsync(req as unknown as IncomingMessage);
     const uploadedFile = Array.isArray(files.file) ? files.file[0] : files.file;
 
     if (!uploadedFile) {
