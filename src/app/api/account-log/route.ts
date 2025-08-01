@@ -4,6 +4,7 @@ import { IncomingForm } from 'formidable';
 import { promisify } from 'util';
 import fs from 'fs';
 import path from 'path';
+import type { IncomingMessage } from 'http'; // ✅ Import necessário para tipagem correta
 
 export const config = {
   api: {
@@ -20,12 +21,18 @@ export async function POST(req: Request) {
   try {
     const form = new IncomingForm({ keepExtensions: true });
     const parseForm = promisify(form.parse.bind(form));
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [fields, files]: [any, any] = await parseForm(req as unknown as IncomingMessage);
     const file = files.file?.[0];
-    if (!file) return NextResponse.json({ success: false, error: 'Arquivo CSV ausente' }, { status: 400 });
+
+    if (!file) {
+      return NextResponse.json({ success: false, error: 'Arquivo CSV ausente' }, { status: 400 });
+    }
 
     const filePath = file.filepath;
     const fileName = path.basename(file.originalFilename || filePath);
+
     if (!fileName.endsWith('.csv')) {
       return NextResponse.json({ success: false, error: 'Tipo de arquivo inválido' }, { status: 400 });
     }
