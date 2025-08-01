@@ -1,4 +1,3 @@
-//
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabaseAdmin"; // usa service_role
 
