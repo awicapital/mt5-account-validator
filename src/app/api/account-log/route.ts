@@ -20,7 +20,7 @@ export async function POST(req: Request) {
   try {
     const form = new IncomingForm({ keepExtensions: true });
     const parseForm = promisify(form.parse.bind(form));
-    const [fields, files] = await parseForm(req as any);
+    const [fields, files]: [any, any] = await parseForm(req as unknown as IncomingMessage);
     const file = files.file?.[0];
     if (!file) return NextResponse.json({ success: false, error: 'Arquivo CSV ausente' }, { status: 400 });
 
