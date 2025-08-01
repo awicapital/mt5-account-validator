@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { IncomingForm } from 'formidable';
+import { IncomingForm, Files } from 'formidable';
 import { promisify } from 'util';
 import fs from 'fs';
 import path from 'path';
-import type { IncomingMessage } from 'http'; // ✅ Import necessário para tipagem correta
+import type { IncomingMessage } from 'http';
 
 export const config = {
   api: {
@@ -19,12 +19,11 @@ const supabase = createClient(
 
 export async function POST(req: Request) {
   try {
-    const form = new IncomingForm({ keepExtensions: true });
+    const form = new IncomingForm({ keepExtensions: true, multiples: false });
     const parseForm = promisify(form.parse.bind(form));
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const [fields, files] = await parseForm(req as unknown as IncomingMessage);
-    const file = files.file?.[0];
+    const { fields, files }: { fields: any; files: Files } = await parseForm(req as unknown as IncomingMessage);
+    const file = Array.isArray(files.file) ? files.file[0] : files.file;
 
     if (!file) {
       return NextResponse.json({ success: false, error: 'Arquivo CSV ausente' }, { status: 400 });
@@ -34,11 +33,12 @@ export async function POST(req: Request) {
     const fileName = path.basename(file.originalFilename || filePath);
 
     if (!fileName.endsWith('.csv')) {
-      return NextResponse.json({ success: false, error: 'Tipo de arquivo inválido' }, { status: 400 });
+      return NextResponse.json({ success: false, error: 'Tipo de arquivo inválido. Envie um .csv' }, { status: 400 });
     }
 
     const fileBuffer = await fs.promises.readFile(filePath);
     const match = fileName.match(/\d+/);
+
     if (!match) {
       return NextResponse.json({ success: false, error: 'ID da conta não encontrado no nome do arquivo' }, { status: 400 });
     }
