@@ -16,7 +16,9 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-function parseFormAsync(req: IncomingMessage): Promise<{ fields: Record<string, string[]>; files: Files }> {
+function parseFormAsync(
+  req: IncomingMessage
+): Promise<{ fields: Record<string, string[] | undefined>; files: Files }> {
   return new Promise((resolve, reject) => {
     const form = new IncomingForm({ keepExtensions: true, multiples: false });
     form.parse(req, (err, fields, files) => {
