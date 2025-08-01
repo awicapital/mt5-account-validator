@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/supabaseAdmin"; // usa service_role
 
 export async function POST(req: Request) {
   try {
@@ -22,7 +22,7 @@ export async function POST(req: Request) {
       .from("logs")
       .upload(filename, body, {
         contentType: "application/json",
-        upsert: true, // sobrescreve se já existir
+        upsert: true,
       });
 
     if (error) {
