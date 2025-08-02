@@ -1,13 +1,26 @@
 import { NextResponse } from "next/server";
-import { supabase } from "@/lib/supabaseAdmin"; // usa service_role
+import { createClient } from "@supabase/supabase-js";
 
 export async function POST(req: Request) {
   try {
-    // 🔍 Verifica se a service_role está carregada
-    console.log("🧪 SERVICE ROLE CHECK:", process.env.SUPABASE_SERVICE_ROLE_KEY?.slice(0, 10) || "❌ NÃO DEFINIDA");
+    // 🔍 Loga todos os headers recebidos
+    console.log("🔍 HEADERS RECEBIDOS:");
+    req.headers.forEach((value, key) => {
+      console.log(`${key}: ${value}`);
+    });
+
+    // 🔐 Extrai a chave da query ou usa fallback
+    const url = new URL(req.url);
+    const token = url.searchParams.get("key") || process.env.SUPABASE_SERVICE_ROLE_KEY;
+    console.log("🔑 KEY USADA:", token?.slice(0, 10) || "❌ NÃO DEFINIDA");
+
+    const supabase = createClient(
+      process.env.SUPABASE_URL!,
+      token!
+    );
 
     const body = await req.text();
-    console.log("📥 JSON RECEBIDO:", body.slice(0, 100)); // mostra parte do JSON
+    console.log("📥 JSON RECEBIDO:", body.slice(0, 100));
 
     const logs = JSON.parse(body);
 
