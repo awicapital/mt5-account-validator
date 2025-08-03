@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import { Loader2, DollarSign, TrendingUp, ArrowLeft, LucideIcon } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import {
@@ -90,7 +89,7 @@ export default function AccountDetailsPage() {
       } catch (err: unknown) {
         const errorMessage = err instanceof Error ? err.message : 'Erro ao carregar dados'
         setError(errorMessage)
-	console.error('❌ Erro total ao buscar JSON:', err)
+        console.error('❌ Erro total ao buscar JSON:', err)
       } finally {
         setLoading(false)
       }
@@ -169,33 +168,151 @@ export default function AccountDetailsPage() {
         </CardContent>
       </Card>
 
-      <div className="flex gap-4 justify-center">
-        <Button variant={mode === 'growth' ? 'default' : 'outline'} onClick={() => setMode('growth')}>Growth</Button>
-        <Button variant={mode === 'profit' ? 'default' : 'outline'} onClick={() => setMode('profit')}>Profit</Button>
-      </div>
-
+      {/* Botões estilo pill */}
       <div className="rounded-2xl bg-[#0f1d31] shadow-md p-6 border border-[#1e2c46]">
-        <h2 className="text-white font-semibold text-base mb-4">Evolução do {mode === 'profit' ? 'Profit' : 'Growth'}</h2>
-        <ResponsiveContainer width="100%" height={300}>
-          <LineChart data={selectedLogs} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
-            <CartesianGrid stroke="#1e2c46" strokeDasharray="3 3" vertical={false} />
-            <XAxis hide />
-            <YAxis stroke="#1f2c44" fontSize={12} tickLine={false} axisLine={false} domain={['dataMin - 2000', 'dataMax + 2000']} tickFormatter={v => `$${Math.abs(v) >= 1000 ? (v / 1000).toFixed(1) + 'K' : v.toFixed(0)}`} />
-            <Tooltip content={({ active, payload }) => {
-              if (!active || !payload || payload.length === 0) return null
-              const log = payload[0].payload as Log
-              const colorClass = log.pnl >= 0 ? 'text-green-400' : 'text-red-400'
-              return (
-                <div className="bg-[#1f2c44] text-white p-3 rounded-md shadow">
-                  <div className="text-sm font-medium">{log.date}</div>
-                  <div className={`text-xs font-medium ${colorClass}`}>PnL acumulado: ${log.pnl.toFixed(2)}</div>
-                </div>
-              )
-            }} />
-            <Line type="monotone" dataKey="pnl" stroke="#3b82f6" strokeWidth={2.5} dot={false} activeDot={false} animationDuration={500} />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
+  <div className="flex items-center justify-between mb-4">
+    <h2 className="text-white font-semibold text-base">Evolução do {mode === 'profit' ? 'Profit' : 'Growth'}</h2>
+
+    <div className="flex gap-2 bg-[#0f1d31] p-1 rounded-full border border-[#1e2c46]">
+      <button
+        onClick={() => setMode('profit')}
+        className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all
+          ${mode === 'profit'
+            ? 'bg-[#2563eb]/20 text-white border border-[#2563eb]'
+            : 'text-[#8ca3ba] hover:text-white'}
+        `}
+      >
+        Profit
+      </button>
+      <button
+        onClick={() => setMode('growth')}
+        className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all
+          ${mode === 'growth'
+            ? 'bg-[#2563eb]/20 text-white border border-[#2563eb]'
+            : 'text-[#8ca3ba] hover:text-white'}
+        `}
+      >
+        Growth
+      </button>
+    </div>
+  </div>
+
+  <ResponsiveContainer width="100%" height={300}>
+    <LineChart data={selectedLogs} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
+      <CartesianGrid stroke="#1e2c46" strokeDasharray="3 3" vertical={false} />
+      <XAxis hide />
+      <YAxis
+        stroke="#1f2c44"
+        fontSize={12}
+        tickLine={false}
+        axisLine={false}
+        domain={['dataMin - 2000', 'dataMax + 2000']}
+        tickFormatter={(v) =>
+          `$${Math.abs(v) >= 1000 ? (v / 1000).toFixed(1) + 'K' : v.toFixed(0)}`
+        }
+      />
+      <Tooltip
+        content={({ active, payload }) => {
+          if (!active || !payload || payload.length === 0) return null
+          const log = payload[0].payload as Log
+          const colorClass = log.pnl >= 0 ? 'text-green-400' : 'text-red-400'
+          return (
+            <div className="bg-[#1f2c44] text-white p-3 rounded-md shadow">
+              <div className="text-sm font-medium">{log.date}</div>
+              <div className={`text-xs font-medium ${colorClass}`}>
+                PnL acumulado: ${log.pnl.toFixed(2)}
+              </div>
+            </div>
+          )
+        }}
+      />
+      <Line
+        type="monotone"
+        dataKey="pnl"
+        stroke="#3b82f6"
+        strokeWidth={2.5}
+        dot={false}
+        activeDot={false}
+        animationDuration={500}
+      />
+    </LineChart>
+  </ResponsiveContainer>
+</div>
+
+<Card className="bg-[#0f1d31] border border-[#1e2c46] shadow-md rounded-2xl">
+  <CardContent className="px-4 py-6 space-y-4">
+    <h3 className="text-white font-semibold text-base">Métricas Avançadas</h3>
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 text-sm text-white">
+      {(() => {
+        const wins = trades.filter(t => t.profit > 0)
+        const losses = trades.filter(t => t.profit < 0)
+        const breakevens = trades.filter(t => t.profit === 0)
+
+        const winCount = wins.length
+        const lossCount = losses.length
+        const breakevenCount = breakevens.length
+        const total = winCount + lossCount + breakevenCount
+
+        const totalTrades = trades.length
+        const winRate = total ? winCount / total : 0
+        const lossRate = total ? lossCount / total : 0
+        const breakevenRate = total ? breakevenCount / total : 0
+
+        const avgWin = winCount ? wins.reduce((acc, t) => acc + t.profit, 0) / winCount : 0
+        const avgLoss = lossCount ? Math.abs(losses.reduce((acc, t) => acc + t.profit, 0) / lossCount) : 0
+        const totalWin = wins.reduce((acc, t) => acc + t.profit, 0)
+        const totalLoss = Math.abs(losses.reduce((acc, t) => acc + t.profit, 0))
+        const expectancy = (winRate * avgWin) - (lossRate * avgLoss)
+        const profitFactor = totalLoss ? totalWin / totalLoss : Infinity
+        const payoffRatio = avgLoss ? avgWin / avgLoss : Infinity
+
+        // drawdown
+        let peak = growthLogs[0]?.pnl ?? 0
+        let maxDD = 0
+        growthLogs.forEach(log => {
+          if (log.pnl > peak) peak = log.pnl
+          const dd = peak - log.pnl
+          if (dd > maxDD) maxDD = dd
+        })
+
+        const recoveryFactor = maxDD ? (totalWin - totalLoss) / maxDD : Infinity
+
+        // melhores/piores dias
+        const grouped: Record<string, number> = {}
+        trades.forEach(t => {
+          const d = t.date.split(' ')[0]
+          grouped[d] = (grouped[d] || 0) + t.profit
+        })
+        const sortedByDay = Object.entries(grouped).sort((a, b) => b[1] - a[1])
+        const bestDay = sortedByDay[0]
+        const worstDay = sortedByDay[sortedByDay.length - 1]
+
+        return [
+          { label: 'Número de Trades', value: totalTrades },
+          { label: 'Win Rate', value: `${(winRate * 100).toFixed(2)}%` },
+          { label: 'Loss Rate', value: `${(lossRate * 100).toFixed(2)}%` },
+          { label: 'Break-even Rate', value: `${(breakevenRate * 100).toFixed(2)}%` },
+          { label: 'Média de Lucro', value: `$${avgWin.toFixed(2)}` },
+          { label: 'Média de Prejuízo', value: `$${avgLoss.toFixed(2)}` },
+          { label: 'Expectativa por Trade', value: `$${expectancy.toFixed(2)}` },
+          { label: 'Profit Factor', value: profitFactor === Infinity ? '∞' : profitFactor.toFixed(2) },
+          { label: 'Payoff Ratio', value: payoffRatio === Infinity ? '∞' : payoffRatio.toFixed(2) },
+          { label: 'Drawdown Máximo', value: `$${maxDD.toFixed(2)}` },
+          { label: 'Recovery Factor', value: recoveryFactor === Infinity ? '∞' : recoveryFactor.toFixed(2) },
+          { label: 'Maior Lucro', value: `$${Math.max(...trades.map(t => t.profit)).toFixed(2)}` },
+          { label: 'Maior Prejuízo', value: `$${Math.min(...trades.map(t => t.profit)).toFixed(2)}` },
+          { label: 'Melhor Dia', value: bestDay ? `${bestDay[0]} ($${bestDay[1].toFixed(2)})` : '-' },
+          { label: 'Pior Dia', value: worstDay ? `${worstDay[0]} ($${worstDay[1].toFixed(2)})` : '-' },
+        ].map((m, idx) => (
+          <div key={idx}>
+            <p className="text-muted-foreground">{m.label}</p>
+            <p className="font-semibold">{m.value}</p>
+          </div>
+        ))
+      })()}
+    </div>
+  </CardContent>
+</Card>
 
       <Card className="bg-[#0f1d31] border border-[#1e2c46] shadow-md rounded-2xl">
         <CardContent className="space-y-4">
