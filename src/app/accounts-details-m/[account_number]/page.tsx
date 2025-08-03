@@ -87,9 +87,10 @@ export default function AccountDetailsPage() {
         setTrades(rawTrades.filter(t => t.type !== 'deposit').reverse())
         setLogs(profitLogs)
         setGrowthLogs(growthLogs)
-      } catch (err: any) {
-        setError(err.message || 'Erro ao carregar dados')
-        console.error('❌ Erro total ao buscar JSON:', err)
+      } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : 'Erro ao carregar dados'
+        setError(errorMessage)
+	console.error('❌ Erro total ao buscar JSON:', err)
       } finally {
         setLoading(false)
       }
