@@ -63,12 +63,17 @@ export default function AccountDetailsPage() {
           .from('logs')
           .download(`${accountNumber}.json`)
 
-        if (error || !file) {
-          throw new Error('Erro ao baixar arquivo do Supabase.')
-        }
+        let rawTrades: Trade[] = []
 
-        const text = await file.text()
-        const rawTrades: Trade[] = JSON.parse(text)
+        if (error || !file) {
+          console.warn('❌ Supabase falhou, tentando fallback local:', error?.message)
+          const res = await fetch(`/mock/${accountNumber}.json`)
+          if (!res.ok) throw new Error('Mock local não encontrado.')
+          rawTrades = await res.json()
+        } else {
+          const text = await file.text()
+          rawTrades = JSON.parse(text)
+        }
 
         const growthLogs: Log[] = []
         const profitLogs: Log[] = []
@@ -87,9 +92,8 @@ export default function AccountDetailsPage() {
         setTrades(rawTrades.filter(t => t.type !== 'deposit').reverse())
         setLogs(profitLogs)
         setGrowthLogs(growthLogs)
-      } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : 'Erro ao carregar dados'
-        setError(message)
+      } catch (err: any) {
+        setError(err.message || 'Erro ao carregar dados')
         console.error('❌ Erro total ao buscar JSON:', err)
       } finally {
         setLoading(false)
@@ -152,7 +156,92 @@ export default function AccountDetailsPage() {
 
   return (
     <div className="p-6 bg-[#03182f] min-h-dvh pb-32 space-y-10">
-      {/* Restante do JSX permanece igual */}
+      <div className="flex items-center gap-3 mb-4">
+        <button onClick={() => router.back()} className="text-white p-2 rounded-full hover:bg-white/10 transition">
+          <ArrowLeft className="w-5 h-5" />
+        </button>
+        <div className="text-white space-y-1">
+          <h1 className="text-2xl font-bold leading-tight">Conta #{accountNumber}</h1>
+          <p className="text-sm text-muted-foreground">Dados carregados via JSON</p>
+        </div>
+      </div>
+
+      <Card className="bg-[#0f1d31] border border-[#1e2c46] shadow-md rounded-2xl">
+        <CardContent className="flex items-start justify-between px-4 py-6">
+          <Stat icon={DollarSign} label="Saldo atual" value={`$${currentBalance.toFixed(2)}`} />
+          <Stat icon={TrendingUp} label="PnL total" value={<span className={pnlColorClass}>${pnlTotal.toFixed(2)}</span>} />
+        </CardContent>
+      </Card>
+
+      <div className="flex gap-4 justify-center">
+        <Button variant={mode === 'growth' ? 'default' : 'outline'} onClick={() => setMode('growth')}>Growth</Button>
+        <Button variant={mode === 'profit' ? 'default' : 'outline'} onClick={() => setMode('profit')}>Profit</Button>
+      </div>
+
+      <div className="rounded-2xl bg-[#0f1d31] shadow-md p-6 border border-[#1e2c46]">
+        <h2 className="text-white font-semibold text-base mb-4">Evolução do {mode === 'profit' ? 'Profit' : 'Growth'}</h2>
+        <ResponsiveContainer width="100%" height={300}>
+          <LineChart data={selectedLogs} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
+            <CartesianGrid stroke="#1e2c46" strokeDasharray="3 3" vertical={false} />
+            <XAxis hide />
+            <YAxis stroke="#1f2c44" fontSize={12} tickLine={false} axisLine={false} domain={['dataMin - 2000', 'dataMax + 2000']} tickFormatter={v => `$${Math.abs(v) >= 1000 ? (v / 1000).toFixed(1) + 'K' : v.toFixed(0)}`} />
+            <Tooltip content={({ active, payload }) => {
+              if (!active || !payload || payload.length === 0) return null
+              const log = payload[0].payload as Log
+              const colorClass = log.pnl >= 0 ? 'text-green-400' : 'text-red-400'
+              return (
+                <div className="bg-[#1f2c44] text-white p-3 rounded-md shadow">
+                  <div className="text-sm font-medium">{log.date}</div>
+                  <div className={`text-xs font-medium ${colorClass}`}>PnL acumulado: ${log.pnl.toFixed(2)}</div>
+                </div>
+              )
+            }} />
+            <Line type="monotone" dataKey="pnl" stroke="#3b82f6" strokeWidth={2.5} dot={false} activeDot={false} animationDuration={500} />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+
+      <Card className="bg-[#0f1d31] border border-[#1e2c46] shadow-md rounded-2xl">
+        <CardContent className="space-y-4">
+          <h3 className="text-white font-semibold text-base">Resumo por Ativo</h3>
+          {Object.values(statsBySymbol).map((s) => (
+            <div key={s.symbol} className="flex justify-between text-sm text-white border-b border-[#1e2c46] pb-2">
+              <span>{s.symbol}</span>
+              <span className="text-right">{s.trades} trades • Vol: {s.volume.toFixed(2)} • <span className={s.profit >= 0 ? 'text-green-400' : 'text-red-400'}>${s.profit.toFixed(2)}</span></span>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      <Card className="bg-[#0f1d31] border border-[#1e2c46] shadow-md rounded-2xl">
+        <CardContent className="pt-6 px-6 pb-4">
+          <h3 className="text-white font-semibold text-base mb-4">Histórico de Trades</h3>
+          <div className="max-h-[400px] overflow-y-auto">
+            <table className="w-full text-sm text-left border-separate border-spacing-0">
+              <thead className="sticky top-0 z-10 bg-[#0f1d31]">
+                <tr className="text-muted-foreground border-b border-[#1f2c44]">
+                  <th className="py-2 sticky top-0 bg-[#0f1d31]">Data</th>
+                  <th className="py-2 sticky top-0 bg-[#0f1d31]">Ativo</th>
+                  <th className="py-2 sticky top-0 bg-[#0f1d31]">Tipo</th>
+                  <th className="py-2 text-right sticky top-0 bg-[#0f1d31]">Volume</th>
+                  <th className="py-2 text-right sticky top-0 bg-[#0f1d31]">Lucro</th>
+                </tr>
+              </thead>
+              <tbody>
+                {trades.map((t, idx) => (
+                  <tr key={idx} className="border-t border-[#1f2c44] hover:bg-[#131f35] transition-colors">
+                    <td className="py-2 text-white whitespace-nowrap">{t.date}</td>
+                    <td className="text-white whitespace-nowrap">{t.symbol}</td>
+                    <td className="text-white capitalize whitespace-nowrap">{t.type}</td>
+                    <td className="text-right text-white whitespace-nowrap">{t.volume}</td>
+                    <td className={`text-right font-semibold whitespace-nowrap ${t.profit > 0 ? 'text-green-400' : t.profit < 0 ? 'text-red-400' : 'text-muted-foreground'}`}>{t.profit.toFixed(2)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }
