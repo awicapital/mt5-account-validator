@@ -63,17 +63,12 @@ export default function AccountDetailsPage() {
           .from('logs')
           .download(`${accountNumber}.json`)
 
-        let rawTrades: Trade[] = []
-
         if (error || !file) {
-          console.warn('❌ Supabase falhou, tentando fallback local:', error?.message)
-          const res = await fetch(`/mock/${accountNumber}.json`)
-          if (!res.ok) throw new Error('Mock local não encontrado.')
-          rawTrades = await res.json()
-        } else {
-          const text = await file.text()
-          rawTrades = JSON.parse(text)
+          throw new Error('Erro ao baixar arquivo do Supabase.')
         }
+
+        const text = await file.text()
+        const rawTrades: Trade[] = JSON.parse(text)
 
         const growthLogs: Log[] = []
         const profitLogs: Log[] = []
