@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef, useLayoutEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -59,21 +59,16 @@ export default function AccountDetailsPage() {
       }
 
       try {
-        const { data: file, error } = await supabase.storage
+        const { data } = supabase.storage
           .from('logs')
-          .download(`${accountNumber}.json`)
+          .getPublicUrl(`${accountNumber}.json`)
 
-        let rawTrades: Trade[] = []
+        const publicUrl = data.publicUrl
+        if (!publicUrl) throw new Error('URL pública não encontrada.')
 
-        if (error || !file) {
-          console.warn('❌ Supabase falhou, tentando fallback local:', error?.message)
-          const res = await fetch(`/mock/${accountNumber}.json`)
-          if (!res.ok) throw new Error('Mock local não encontrado.')
-          rawTrades = await res.json()
-        } else {
-          const text = await file.text()
-          rawTrades = JSON.parse(text)
-        }
+        const res = await fetch(publicUrl)
+        if (!res.ok) throw new Error('Erro ao baixar arquivo JSON público.')
+        const rawTrades: Trade[] = await res.json()
 
         const growthLogs: Log[] = []
         const profitLogs: Log[] = []
