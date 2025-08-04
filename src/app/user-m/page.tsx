@@ -1,274 +1,217 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  Loader2,
-  LogOut,
-  User2,
-  Mail,
-  Phone,
-  ChevronRight
-} from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { format, addMonths, subMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameMonth, isToday } from "date-fns";
+
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter
-} from "@/components/ui/dialog";
-import { supabase } from "@/lib/supabase";
+import { Card, CardContent } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
-import dayjs from "dayjs";
-import "dayjs/locale/pt-br";
-import imageCompression from "browser-image-compression";
+import { supabase } from "@/lib/supabase";
+import { UserCard } from "@/components/ui/user-card";
+import { useAuth } from "@/components/providers/auth-provider";
 
-dayjs.locale("pt-br");
-
-interface UserProfile {
+interface Account {
   id: string;
-  full_name: string | null;
-  phone_number: string | null;
-  email: string | null;
-  access_level: string | null;
-  access_expires_at: string | null;
-  avatar_url?: string | null;
+  account_number: string;
+  balance: number | null;
+  ea_name?: string;
+  is_active: boolean;
+}
+interface Trade {
+  date: string;
+  profit: number;
+  type: string;
 }
 
-export default function UserProfilePage() {
+export default function MobileDashboardPage() {
   const router = useRouter();
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { user, loading: authLoading } = useAuth();
+
   const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState<UserProfile | null>(null);
-  const [openDialog, setOpenDialog] = useState(false);
-  const [editing, setEditing] = useState<"name" | "phone" | null>(null);
-  const [newValue, setNewValue] = useState("");
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [requestDialogOpen, setRequestDialogOpen] = useState(false);
+  const [accountNumber, setAccountNumber] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [calendarDate, setCalendarDate] = useState(new Date());
+  const [pnlByDate, setPnlByDate] = useState<Record<string, number>>({});
+  const [tradesByDate, setTradesByDate] = useState<Record<string, number>>({});
 
-  const fetchProfile = async () => {
-    const { data: auth } = await supabase.auth.getUser();
-    if (!auth?.user?.id) return router.push("/login");
-
-    const { data, error } = await supabase.from("users").select("*").eq("id", auth.user.id).single();
-    if (error) {
-      toast.error("Erro ao carregar perfil");
-      return;
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push("/login");
+    } else if (user) {
+      fetchAccounts(user.email);
     }
-    setUser({ ...data, email: auth.user.email });
+  }, [user, authLoading]);
+
+  const fetchAccounts = async (userEmail: string) => {
+    const { data: accountsData } = await supabase.from("accounts").select("*").eq("email", userEmail);
+    if (accountsData) {
+      setAccounts(accountsData as Account[]);
+      await fetchPNL(accountsData as Account[]);
+    }
     setLoading(false);
   };
 
-  const updateField = async () => {
-    if (!user || !editing) return;
-    const updates = editing === "name" ? { full_name: newValue } : { phone_number: newValue };
-    const { error } = await supabase.from("users").update(updates).eq("id", user.id);
-    if (error) return toast.error("Erro ao atualizar dados");
-    setEditing(null);
-    setNewValue("");
-    toast.success("Dados atualizados com sucesso!");
-    fetchProfile();
+  const fetchPNL = async (accounts: Account[]) => {
+    const allTrades: Trade[] = [];
+    await Promise.all(
+      accounts.map(async (acc) => {
+        const path = `${acc.account_number}.json`;
+        const { data: urlData } = supabase.storage.from("logs").getPublicUrl(path);
+        if (!urlData?.publicUrl) return;
+
+        try {
+          const res = await fetch(urlData.publicUrl);
+          if (!res.ok) return;
+          const trades: Trade[] = await res.json();
+          allTrades.push(...trades.filter((t) => t.type !== "deposit"));
+        } catch {}
+      })
+    );
+
+    const pnl: Record<string, number> = {};
+    const tradeCounts: Record<string, number> = {};
+
+    allTrades.forEach((t) => {
+      const date = format(new Date(t.date), "yyyy-MM-dd");
+      pnl[date] = (pnl[date] || 0) + t.profit;
+      tradeCounts[date] = (tradeCounts[date] || 0) + 1;
+    });
+
+    setPnlByDate(pnl);
+    setTradesByDate(tradeCounts);
   };
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.push("/login");
-  };
+  const handleSubmit = async () => {
+    if (!accountNumber || !user?.email) return toast.error("Informe o número da conta.");
 
-  const handleAvatarClick = () => {
-    fileInputRef.current?.click();
-  };
+    setSubmitting(true);
+    const { error } = await supabase.from("accounts").insert({
+      account_number: Number(accountNumber),
+      email: user.email,
+      requested_at: new Date().toISOString(),
+      is_active: false,
+    });
+    setSubmitting(false);
 
-  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files?.[0] || !user) return;
-    setLoading(true);
-
-    try {
-      const file = e.target.files[0];
-      const compressedFile = await imageCompression(file, {
-        maxSizeMB: 0.8,
-        maxWidthOrHeight: 512,
-        useWebWorker: true
-      });
-
-      const filePath = `${user.id}-${Date.now()}`;
-
-      const { data: uploadData, error: uploadError } = await supabase.storage.from("avatars").upload(filePath, compressedFile, {
-        cacheControl: "3600",
-        upsert: true
-      });
-      if (uploadError || !uploadData) {
-        console.error("Erro no upload:", uploadError?.message || uploadError);
-        return toast.error(`Erro ao enviar imagem: ${uploadError?.message || "erro desconhecido"}`);
-      }
-
-      const { data: publicUrlData } = supabase.storage.from("avatars").getPublicUrl(filePath);
-      const publicUrl = publicUrlData.publicUrl;
-
-      if (!publicUrl) {
-        console.error("Erro ao obter URL pública");
-        return toast.error("Erro ao obter URL da imagem");
-      }
-
-      const { error: updateError } = await supabase.from("users").update({ avatar_url: publicUrl }).eq("id", user.id);
-      if (updateError) {
-        console.error("Erro ao atualizar avatar no banco:", updateError);
-        return toast.error("Erro ao atualizar avatar");
-      }
-
-      toast.success("Avatar atualizado!");
-      fetchProfile();
-    } catch (error) {
-      console.error("Erro inesperado:", error);
-      toast.error("Erro ao comprimir ou enviar a imagem");
-    } finally {
-      setLoading(false);
+    if (!error) {
+      toast.success("Solicitação enviada com sucesso!");
+      setRequestDialogOpen(false);
+      setAccountNumber("");
+      await fetchAccounts(user.email);
+    } else {
+      toast.error("Erro ao solicitar conta.");
     }
   };
 
-  useEffect(() => {
-    fetchProfile();
-  }, []);
+  const formatShortCurrency = (value: number) => {
+    const abs = Math.abs(value);
+    let formatted = abs >= 1e6 ? `${(abs / 1e6).toFixed(1).replace(/\.0$/, "")}M` : abs >= 1e3 ? `${(abs / 1e3).toFixed(1).replace(/\.0$/, "")}K` : abs.toFixed(0);
+    return `${value > 0 ? "+" : "-"}$${formatted}`;
+  };
 
-  if (loading || !user) {
+  const renderCalendar = () => {
+    const startMonth = startOfMonth(calendarDate);
+    const endMonth = endOfMonth(calendarDate);
+    const startDate = startOfWeek(startMonth);
+    const endDate = endOfWeek(endMonth);
+    const days = [];
+
+    let current = startDate;
+    while (current <= endDate) {
+      days.push(current);
+      current = addDays(current, 1);
+    }
+
     return (
-      <div className="h-dvh flex items-center justify-center">
-        <Loader2 className="w-6 h-6 text-white animate-spin" />
+      <div className="grid grid-cols-7 gap-2 text-center text-xs">
+        {["D", "S", "T", "Q", "Q", "S", "S"].map((d, i) => (
+          <div key={i} className="text-muted-foreground font-medium">{d}</div>
+        ))}
+        {days.map((day, i) => {
+          const isCurrentMonth = isSameMonth(day, calendarDate);
+          const isCurrentDay = isToday(day);
+          const key = format(day, "yyyy-MM-dd");
+
+          if (!isCurrentMonth) {
+            return (
+              <div key={i} className="aspect-square flex items-center justify-center rounded-md text-muted-foreground border border-transparent text-xs">
+                {format(day, "d")}
+              </div>
+            );
+          }
+
+          const pnl = pnlByDate[key] ?? 0;
+          const tradesCount = tradesByDate[key] ?? 0;
+
+          const bgClass = pnl > 0 ? "bg-[#10382c] border-[#00ff99]" : pnl < 0 ? "bg-[#3f1f1f] border-[#ff4c4c]" : isCurrentDay ? "bg-[#268bff] border-[#268bff]" : "bg-[#1e2b45] border-[#1f2c44]";
+          const pnlClass = pnl > 0 ? "text-[#00ff99]" : pnl < 0 ? "text-[#ff4c4c]" : "text-white/40";
+
+          return (
+            <div key={i} className={`aspect-square relative rounded-md border p-1 text-white ${bgClass}`}>
+              <div className="absolute top-1 right-1 text-[10px] text-white/70">{format(day, "d")}</div>
+              {pnl !== 0 && (
+                <div className="absolute inset-0 flex items-center justify-center px-1">
+                  <div className={`text-[11px] leading-tight ${pnlClass}`}>{formatShortCurrency(pnl)}</div>
+                </div>
+              )}
+              {tradesCount > 0 && (
+                <div className="absolute bottom-1 right-1 text-[10px] text-white/50">{tradesCount} trade{tradesCount > 1 && "s"}</div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  if (loading || authLoading) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <Loader2 className="animate-spin w-6 h-6 text-white" />
       </div>
     );
   }
 
   return (
-    <div className="p-4 bg-[#03182f] min-h-dvh space-y-6 pb-28">
-      <h1 className="text-lg font-semibold text-white text-center">Perfil</h1>
+    <div className="p-4 space-y-6 bg-[#03182f] min-h-dvh pb-28">
+      <h1 className="text-lg font-semibold text-white">Panorama Geral</h1>
+      <UserCard userName={user?.user_metadata?.name} email={user?.email ?? ""} accounts={accounts} />
 
-      <Card className="bg-[#131f35] border border-[#1f2c44] text-white">
-        <CardContent className="flex items-start gap-4 p-4">
-          <div className="flex flex-col items-center gap-1">
-            <div
-              onClick={handleAvatarClick}
-              className="w-20 h-20 flex items-center justify-center rounded-full bg-[#268bff] text-white text-xl font-bold overflow-hidden cursor-pointer transition-all duration-300"
-            >
-              {user.avatar_url ? (
-                <img
-                  src={user.avatar_url}
-                  alt="Avatar"
-                  className="w-full h-full object-cover rounded-full"
-                />
-              ) : (
-                user.full_name?.split(" ").map((n) => n[0]).join("").slice(0, 2) || "U"
-              )}
-              <input
-                type="file"
-                accept="image/*"
-                ref={fileInputRef}
-                className="hidden"
-                onChange={handleAvatarChange}
-              />
+      <div className="space-y-4 pt-4">
+        <h2 className="text-white font-semibold text-lg">Calendário</h2>
+        <Card className="bg-[#03182f] border-none">
+          <CardContent className="p-4 space-y-4">
+            <div className="flex items-center justify-between">
+              <Button size="icon" variant="ghost" onClick={() => setCalendarDate(subMonths(calendarDate, 1))}><ChevronLeft /></Button>
+              <div className="text-white font-semibold">{format(calendarDate, "MMMM yyyy")}</div>
+              <Button size="icon" variant="ghost" onClick={() => setCalendarDate(addMonths(calendarDate, 1))}><ChevronRight /></Button>
             </div>
-            <span
-              onClick={handleAvatarClick}
-              className="text-xs text-[#94a3b8] hover:underline cursor-pointer"
-            >
-              Alterar foto
-            </span>
-          </div>
-
-          <div className="flex-1 space-y-1 ml-2">
-            <div className="text-base font-medium">
-              {user.full_name || "Usuário sem nome"}
-            </div>
-            <div className="text-sm text-muted-foreground">
-              Nível: {user.access_level || "free"}
-            </div>
-            <div className="text-xs text-[#94a3b8]">
-              Expira em{" "}
-              {user.access_expires_at
-                ? dayjs(user.access_expires_at).format("D [de] MMMM [de] YYYY")
-                : "—"}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="bg-[#1f2c44] border-none">
-        <CardContent className="p-4 text-white text-sm rounded-xl">
-          {/* Comentário válido */}
-        </CardContent>
-      </Card>
-
-      <div className="divide-y divide-[#2c3a55] rounded-xl overflow-hidden border border-[#1f2c44] bg-[#131f35]">
-        <button onClick={() => { setEditing("name"); setNewValue(user.full_name || ""); }} className="w-full text-left">
-          <div className="flex items-center justify-between px-4 py-4 text-white">
-            <div className="flex items-center gap-3">
-              <User2 className="w-5 h-5" />
-              <span className="text-sm font-medium">{user.full_name || "Sem nome definido"}</span>
-            </div>
-            <ChevronRight className="w-4 h-4 text-muted-foreground" />
-          </div>
-        </button>
-        <div className="flex items-center justify-between px-4 py-4 text-white">
-          <div className="flex items-center gap-3">
-            <Mail className="w-5 h-5" />
-            <span className="text-sm font-medium">{user.email || "Sem e-mail"}</span>
-          </div>
-        </div>
-        <button onClick={() => { setEditing("phone"); setNewValue(user.phone_number || ""); }} className="w-full text-left">
-          <div className="flex items-center justify-between px-4 py-4 text-white">
-            <div className="flex items-center gap-3">
-              <Phone className="w-5 h-5" />
-              <span className="text-sm font-medium">{user.phone_number || "Sem telefone"}</span>
-            </div>
-            <ChevronRight className="w-4 h-4 text-muted-foreground" />
-          </div>
-        </button>
+            {renderCalendar()}
+          </CardContent>
+        </Card>
       </div>
 
-      <Button
-        className="bg-[#268bff] hover:bg-[#1e78e0] text-white w-full"
-        onClick={() => setOpenDialog(true)}
-      >
-        <LogOut className="w-4 h-4 mr-2" /> Logout
-      </Button>
-
-      <Dialog open={openDialog} onOpenChange={setOpenDialog}>
-        <DialogContent className="bg-[#131f35] border border-[#1f2c44]">
+      <Dialog open={requestDialogOpen} onOpenChange={setRequestDialogOpen}>
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle className="text-white text-xl text-center">Deseja sair da sua conta?</DialogTitle>
+            <DialogTitle className="text-xl font-semibold text-center text-white">Solicitar nova conta</DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-muted-foreground text-center mt-1 mb-5">Você será redirecionado para a tela de login.</p>
-          <DialogFooter className="flex justify-center">
-            <Button className="bg-red-600 hover:bg-red-700 text-white" onClick={handleLogout}>
-              <LogOut className="w-4 h-4 mr-2" /> Sair
+          <div className="space-y-2">
+            <Label htmlFor="account" className="text-white">Número da Conta</Label>
+            <Input id="account" type="number" value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} />
+          </div>
+          <DialogFooter className="flex justify-center mt-4">
+            <Button className="bg-[#268bff] text-white w-full" onClick={handleSubmit} disabled={submitting}>
+              {submitting ? "Enviando..." : "Enviar Solicitação"}
             </Button>
           </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={!!editing} onOpenChange={() => { setEditing(null); setNewValue(""); }}>
-        <DialogContent className="bg-[#131f35] border border-[#1f2c44]">
-          <DialogHeader>
-            <DialogTitle className="text-white text-xl text-center">
-              Editar {editing === "name" ? "nome" : "telefone"}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 mt-2">
-            <input
-              type="text"
-              value={newValue}
-              onChange={(e) => setNewValue(e.target.value)}
-              placeholder={editing === "name" ? "Digite seu nome" : "Digite seu telefone"}
-              className="w-full bg-[#1f2c44] text-white border border-[#2c3a55] rounded-md px-3 py-2 placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#268bff]"
-            />
-            <DialogFooter>
-              <Button
-                className="bg-[#268bff] hover:bg-[#1e78e0] text-white w-full"
-                onClick={updateField}
-              >
-                Salvar alterações
-              </Button>
-            </DialogFooter>
-          </div>
         </DialogContent>
       </Dialog>
     </div>

@@ -17,10 +17,18 @@ interface Account {
   balance: number | null;
   ea_name?: string;
   is_active: boolean;
-  pnl_today?: number | null;
+  pnl_total?: number;
 }
 
-function AccountCard({ account, showBalance, onDelete }: { account: Account; showBalance: boolean; onDelete: () => void }) {
+function AccountCard({
+  account,
+  showBalance,
+  onDelete,
+}: {
+  account: Account;
+  showBalance: boolean;
+  onDelete: () => void;
+}) {
   const x = useMotionValue(0);
   const controls = useAnimation();
   const bgColor = useTransform(x, [-100, 0], ["#7f1d1d", "#131f35"]);
@@ -68,8 +76,20 @@ function AccountCard({ account, showBalance, onDelete }: { account: Account; sho
             <div className="text-sm font-semibold">
               {showBalance ? `$${account.balance?.toFixed(2) || "—"}` : "••••"}
             </div>
-            <div className={`text-xs font-semibold ${account.pnl_today ? (account.pnl_today > 0 ? "text-green-400" : "text-red-400") : "text-muted-foreground"}`}>
-              {account.pnl_today ? `${account.pnl_today > 0 ? "+" : ""}${account.pnl_today.toFixed(2)}` : "PNL hoje"}
+            <div
+              className={`text-xs font-semibold ${
+                account.pnl_total !== undefined
+                  ? account.pnl_total > 0
+                    ? "text-green-400"
+                    : account.pnl_total < 0
+                    ? "text-red-400"
+                    : "text-muted-foreground"
+                  : "text-muted-foreground"
+              }`}
+            >
+              {account.pnl_total !== undefined
+                ? `${account.pnl_total > 0 ? "+$" : "-$"}${Math.abs(account.pnl_total).toFixed(2)}`
+                : "PNL total"}
             </div>
           </div>
         </CardContent>
@@ -94,7 +114,40 @@ export default function AccountsPage() {
     if (!user?.user?.email) return router.push("/login");
 
     const { data } = await supabase.from("accounts").select("*").eq("email", user.user.email);
-    if (data) setAccounts(data as Account[]);
+    if (!data) return;
+
+    const enhancedAccounts = await Promise.all(
+      data.map(async (account: Account) => {
+        try {
+          const path = `${account.account_number}.json`;
+          const { data: urlData, error: urlError } = supabase.storage.from("logs").getPublicUrl(path);
+          if (urlError || !urlData?.publicUrl) return account;
+
+          const res = await fetch(urlData.publicUrl);
+          if (!res.ok) return account;
+
+          const trades: { profit: number; type: string; date: string }[] = await res.json();
+          const pnlLogs: number[] = [];
+
+          let pnl = 0;
+          for (const trade of trades) {
+            if (trade.type !== "deposit") {
+              pnl += trade.profit;
+              pnlLogs.push(pnl);
+            }
+          }
+
+          return {
+            ...account,
+            pnl_total: pnlLogs.at(-1) || 0,
+          };
+        } catch {
+          return account;
+        }
+      })
+    );
+
+    setAccounts(enhancedAccounts);
     setLoading(false);
   };
 
@@ -103,7 +156,7 @@ export default function AccountsPage() {
   }, []);
 
   const totalBalance = accounts.reduce((sum, acc) => sum + (acc.balance || 0), 0);
-  const pnlTotal = accounts.reduce((sum, acc) => sum + (acc.pnl_today || 0), 0);
+  const pnlTotal = accounts.reduce((sum, acc) => sum + (acc.pnl_total || 0), 0);
   const pnlBase = totalBalance - pnlTotal;
   const pnlPercent = pnlBase > 0 ? (pnlTotal / pnlBase) * 100 : 0;
 
@@ -156,14 +209,18 @@ export default function AccountsPage() {
         <div className="text-4xl font-bold text-white">
           {showBalance ? `$${totalBalance.toFixed(2)}` : "••••"}
         </div>
-        <div className={`text-sm mt-1 ${pnlPercent > 0 ? "text-green-400" : pnlPercent < 0 ? "text-red-400" : "text-muted-foreground"}`}>
+        <div
+          className={`text-sm mt-1 ${
+            pnlPercent > 0 ? "text-green-400" : pnlPercent < 0 ? "text-red-400" : "text-muted-foreground"
+          }`}
+        >
           {showBalance ? `${pnlTotal >= 0 ? "+" : ""}${pnlPercent.toFixed(2)}%` : ""}
         </div>
       </div>
 
       <h2 className="text-lg font-semibold text-white pt-2">Minhas Contas</h2>
       <div className="space-y-4">
-        {accounts.map(account => (
+        {accounts.map((account) => (
           <AccountCard
             key={account.id}
             account={account}

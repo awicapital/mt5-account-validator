@@ -8,10 +8,11 @@ type AccountCardProps = {
     ea_name?: string;
     balance: number;
     is_active: boolean;
+    pnl_total?: number | null; // adicionado campo para PNL total
   };
   showControls?: boolean;
   onToggle?: () => void;
-  className?: string; // adicionada prop className opcional
+  className?: string;
 };
 
 export function AccountCard({
@@ -20,6 +21,9 @@ export function AccountCard({
   onToggle,
   className,
 }: AccountCardProps) {
+  const formatCurrency = (value: number | null | undefined) =>
+    typeof value === "number" ? `R$ ${value.toFixed(2)}` : "—";
+
   return (
     <Card className={className}>
       <CardContent className="p-4 space-y-2">
@@ -39,15 +43,32 @@ export function AccountCard({
         </div>
 
         <div className="text-sm space-y-1">
-          <p className="text-muted-foreground">EA:</p>
-          <p>{account.ea_name || "—"}</p>
+          <div>
+            <p className="text-muted-foreground">EA:</p>
+            <p>{account.ea_name || "—"}</p>
+          </div>
 
-          <p className="text-muted-foreground">Saldo:</p>
-          <p>
-            {typeof account.balance === "number"
-              ? `R$ ${account.balance.toFixed(2)}`
-              : "—"}
-          </p>
+          <div>
+            <p className="text-muted-foreground">Saldo:</p>
+            <p>{formatCurrency(account.balance)}</p>
+          </div>
+
+          <div>
+            <p className="text-muted-foreground">PNL total:</p>
+            <p
+              className={
+                account.pnl_total !== null && account.pnl_total !== undefined
+                  ? account.pnl_total > 0
+                    ? "text-green-500"
+                    : "text-red-500"
+                  : "text-muted-foreground"
+              }
+            >
+              {account.pnl_total !== null && account.pnl_total !== undefined
+                ? `${account.pnl_total > 0 ? "+" : ""}${account.pnl_total.toFixed(2)}`
+                : "—"}
+            </p>
+          </div>
         </div>
 
         {showControls && onToggle && (

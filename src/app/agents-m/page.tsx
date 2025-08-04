@@ -1,98 +1,128 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { useSwipeable } from "react-swipeable";
-import { motion, useAnimation, useMotionValue, useTransform } from "framer-motion";
-import { Card, CardContent } from "@/components/ui/card";
-import { Loader2, Server } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { useState, useRef, useEffect } from "react";
+import { Loader2, ArrowUp } from "lucide-react";
 
-interface Account {
-  id: string;
-  account_number: string;
-  balance: number | null;
-  ea_name?: string;
-  is_active: boolean;
-  pnl_today?: number | null;
-}
+export default function ApolloAIPage() {
+  const [messages, setMessages] = useState([
+    {
+      role: "system",
+      content:
+        "Você é Apollo AI, um analista financeiro que fornece respostas técnicas e objetivas sobre o mercado.",
+    },
+  ]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
-function AccountCard({ account }: { account: Account }) {
-  const x = useMotionValue(0);
-  const controls = useAnimation();
-  const bgColor = useTransform(x, [-100, 0], ["#7f1d1d", "#131f35"]);
+  const hasConversationStarted = messages.length > 1;
 
-  return (
-    <motion.div animate={controls} style={{ x, backgroundColor: bgColor }} className="overflow-hidden rounded-xl">
-      <Card className="bg-transparent border border-[#1f2c44] text-white">
-        <CardContent className="flex items-center justify-between p-4 space-x-4">
-          <div className="bg-[#1e2b45] p-2 rounded-lg">
-            <Server className="w-6 h-6 text-white" />
-          </div>
-          <div className="flex-1">
-            <div className="text-sm font-medium">
-              #{account.account_number} — {account.ea_name || "Sem EA"}
-            </div>
-            <div className={`text-xs font-semibold mt-1 ${account.is_active ? "text-green-400" : "text-yellow-400"}`}>{account.is_active ? "Ativa" : "Pendente"}</div>
-          </div>
-          <div className="text-right">
-            <div className="text-sm font-semibold">${account.balance?.toFixed(2) || "—"}</div>
-            <div className={`text-xs font-semibold ${account.pnl_today ? (account.pnl_today > 0 ? "text-green-400" : "text-red-400") : "text-muted-foreground"}`}>
-              {account.pnl_today ? `${account.pnl_today > 0 ? "+" : ""}${account.pnl_today.toFixed(2)}` : "PNL hoje"}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </motion.div>
-  );
-}
+  async function handleSend() {
+    if (!input.trim()) return;
 
-export default function AccountsPage() {
-  const router = useRouter();
-  const [loading, setLoading] = useState(true);
-  const [accounts, setAccounts] = useState<Account[]>([]);
+    const updated = [...messages, { role: "user", content: input }];
+    setMessages(updated);
+    setInput("");
+    setLoading(true);
 
-  const fetchAccounts = async () => {
-    const { data: user } = await supabase.auth.getUser();
-    if (!user?.user?.email) return router.push("/login");
+    try {
+      const res = await fetch("/api/apollo-ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: updated }),
+      });
 
-    const { data } = await supabase.from("accounts").select("*").eq("email", user.user.email);
-    if (data) setAccounts(data as Account[]);
+      const data = await res.json();
+      const reply =
+        data.choices?.[0]?.message?.content || "Erro ao obter resposta.";
+      setMessages([...updated, { role: "assistant", content: reply }]);
+    } catch (err) {
+      setMessages([
+        ...updated,
+        { role: "assistant", content: "Erro de conexão com o Apollo AI." },
+      ]);
+    }
+
     setLoading(false);
-  };
-
-  useEffect(() => {
-    fetchAccounts();
-  }, []);
-
-  const pnlTotal = accounts.reduce((sum, acc) => sum + (acc.pnl_today || 0), 0);
-
-  if (loading) {
-    return (
-      <div className="h-full flex items-center justify-center">
-        <Loader2 className="animate-spin w-6 h-6 text-white" />
-      </div>
-    );
   }
 
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  useEffect(() => {
+    setTimeout(() => {
+      containerRef.current?.scrollTo({ top: containerRef.current.scrollHeight, behavior: "smooth" });
+    }, 100);
+  }, []);
+
   return (
-    <div className="p-4 bg-[#03182f] min-h-dvh space-y-6 pb-20">
-      <h1 className="text-lg font-semibold text-white">Resumo de PNL</h1>
-
-      <Card className="bg-[#0a294d] border border-[#1f2c44] text-white">
-        <CardContent className="p-4 text-center">
-          <div className="text-muted-foreground text-sm">PNL Total Hoje</div>
-          <div className={`text-3xl font-bold mt-2 ${pnlTotal > 0 ? "text-green-400" : pnlTotal < 0 ? "text-red-400" : "text-white"}`}>
-            {pnlTotal >= 0 ? "+" : ""}{pnlTotal.toFixed(2)}
+    <div className="relative z-40 flex flex-col min-h-screen bg-[#03182f]">
+      <main
+        ref={containerRef}
+        className="flex-1 flex flex-col overflow-y-auto px-6 pt-6 pb-[110px] scroll-smooth"
+      >
+        {!hasConversationStarted ? (
+          <div className="flex flex-1 flex-col items-center justify-center text-white text-center space-y-4">
+            <img
+              src="/apollo_ai.png"
+              alt="Apollo Logo"
+              className="w-40 h-40 opacity-90"
+            />
+            <h2 className="text-xl font-semibold">Oi, sou o Apollo</h2>
+            <p className="text-sm text-gray-300">Como posso te ajudar hoje?</p>
           </div>
-        </CardContent>
-      </Card>
+        ) : (
+          <div className="flex flex-col gap-4">
+            {messages
+              .filter((m) => m.role !== "system")
+              .map((m, i) => (
+                <div
+                  key={i}
+                  className={`text-sm leading-relaxed whitespace-pre-wrap max-w-[85%] rounded-2xl px-5 py-3 ${
+                    m.role === "user"
+                      ? "ml-auto bg-blue-600 text-white"
+                      : "mr-auto bg-[#e2e8f0] text-gray-800"
+                  }`}
+                >
+                  {m.content}
+                </div>
+              ))}
+            <div ref={messagesEndRef} />
+          </div>
+        )}
+      </main>
 
-      <h2 className="text-lg font-semibold text-white pt-2">Minhas Contas</h2>
-      <div className="space-y-4">
-        {accounts.map(account => (
-          <AccountCard key={account.id} account={account} />
-        ))}
+      <div className="fixed bottom-[80px] left-0 right-0 z-50 px-4">
+        <div className="relative w-full max-w-3xl mx-auto rounded-2xl shadow-2xl backdrop-blur-md bg-[#0f1b2ecc] border border-white/10">
+          <textarea
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                handleSend();
+              }
+            }}
+            placeholder="Apollo, analise a minha conta número X"
+            rows={2}
+            className="w-full pr-10 resize-none text-sm text-white placeholder:text-gray-400 bg-transparent border-none rounded-2xl px-4 py-3 focus:outline-none"
+          />
+          {input.trim() !== "" && (
+            <button
+              onClick={handleSend}
+              disabled={loading}
+              className="absolute bottom-3 right-3 p-1.5 rounded-full bg-blue-500 transition-opacity duration-200 ease-in-out hover:bg-blue-600"
+            >
+              {loading ? (
+                <Loader2 className="w-4 h-4 animate-spin text-white" />
+              ) : (
+                <ArrowUp className="w-4 h-4 text-white" />
+              )}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

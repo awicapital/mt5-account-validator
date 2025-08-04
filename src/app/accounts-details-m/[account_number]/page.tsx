@@ -2,19 +2,15 @@
 
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { Card, CardContent } from '@/components/ui/card'
-import { Loader2, DollarSign, TrendingUp, ArrowLeft, LucideIcon } from 'lucide-react'
+import { Loader2, ArrowLeft } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  Tooltip,
-  CartesianGrid,
-  ResponsiveContainer,
-} from 'recharts'
-import React from 'react'
+
+import { AccountResumeCard } from '@/components/ui/account-resume-card'
+import { AccountChartCard } from '@/components/ui/account-chart-card'
+import { AccountMetricsCard } from '@/components/ui/account-metrics-card'
+import { AccountSymbolsCard } from '@/components/ui/account-symbols-card'
+import { AccountSymbolsChart } from '@/components/ui/account-symbols-chart'
+import { AccountHistoryCard } from '@/components/ui/account-history-card'
 
 interface Trade {
   account_number: number
@@ -48,6 +44,7 @@ export default function AccountDetailsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [mode, setMode] = useState<'profit' | 'growth'>('profit')
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -58,14 +55,21 @@ export default function AccountDetailsPage() {
       }
 
       try {
-        const { data } = supabase.storage
-          .from('logs')
-          .getPublicUrl(`${accountNumber}.json`)
+        const path = `${accountNumber}.json`
 
-        const publicUrl = data.publicUrl
-        if (!publicUrl) throw new Error('URL pública não encontrada.')
+        const { data: urlData, error: urlError } = supabase.storage.from('logs').getPublicUrl(path)
+        if (urlError || !urlData.publicUrl) {
+          throw new Error(urlError?.message || 'Não conseguiu gerar URL pública.')
+        }
 
-        const res = await fetch(publicUrl)
+        // HEAD request para pegar Last-Modified
+        const headRes = await fetch(urlData.publicUrl, { method: 'HEAD' })
+        const lastModified = headRes.headers.get('last-modified')
+        if (lastModified) {
+          setLastUpdated(new Date(lastModified).toISOString())
+        }
+
+        const res = await fetch(urlData.publicUrl)
         if (!res.ok) throw new Error('Erro ao baixar arquivo JSON público.')
         const rawTrades: Trade[] = await res.json()
 
@@ -83,13 +87,13 @@ export default function AccountDetailsPage() {
           growthLogs.push({ date: t.date, pnl: total, end_balance: 0 })
         })
 
-        setTrades(rawTrades.filter(t => t.type !== 'deposit').reverse())
+        setTrades(rawTrades.filter((t) => t.type !== 'deposit').reverse())
         setLogs(profitLogs)
         setGrowthLogs(growthLogs)
       } catch (err: unknown) {
         const errorMessage = err instanceof Error ? err.message : 'Erro ao carregar dados'
         setError(errorMessage)
-        console.error('❌ Erro total ao buscar JSON:', err)
+        console.error('❌ Erro ao buscar JSON:', err)
       } finally {
         setLoading(false)
       }
@@ -123,10 +127,8 @@ export default function AccountDetailsPage() {
     )
   }
 
-  const selectedLogs = mode === 'profit' ? logs : growthLogs
   const currentBalance = growthLogs.at(-1)?.pnl || 0
   const pnlTotal = logs.at(-1)?.pnl || 0
-  const pnlColorClass = pnlTotal > 0 ? 'text-green-400' : pnlTotal < 0 ? 'text-red-400' : 'text-muted-foreground'
 
   const statsBySymbol = trades.reduce<Record<string, Summary>>((acc, t) => {
     const symbol = t.symbol
@@ -137,224 +139,105 @@ export default function AccountDetailsPage() {
     return acc
   }, {})
 
-  const Stat = ({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string | React.ReactNode }) => (
-    <div className="flex items-start gap-3">
-      <div className="p-2 rounded-md bg-[#1e2c46]">
-        <Icon className="text-[#8CA3BA] w-5 h-5" />
-      </div>
-      <div className="flex flex-col">
-        <span className="text-xs text-muted-foreground font-medium">{label}</span>
-        <span className="text-lg font-semibold text-white leading-tight">{value}</span>
-      </div>
-    </div>
+  const wins = trades.filter((t) => t.profit > 0)
+  const losses = trades.filter((t) => t.profit < 0)
+  const breakevens = trades.filter((t) => t.profit === 0)
+
+  const winRate = wins.length / trades.length || 0
+  const lossRate = losses.length / trades.length || 0
+  const breakevenRate = breakevens.length / trades.length || 0
+
+  const avgWin = wins.length ? wins.reduce((acc, t) => acc + t.profit, 0) / wins.length : 0
+  const avgLoss = losses.length ? Math.abs(losses.reduce((acc, t) => acc + t.profit, 0) / losses.length) : 0
+  const totalWin = wins.reduce((acc, t) => acc + t.profit, 0)
+  const totalLoss = Math.abs(losses.reduce((acc, t) => acc + t.profit, 0))
+  const expectancy = winRate * avgWin - lossRate * avgLoss
+  const profitFactor = totalLoss ? totalWin / totalLoss : Infinity
+  const payoffRatio = avgLoss ? avgWin / avgLoss : Infinity
+
+  let peak = growthLogs[0]?.pnl ?? 0
+  let maxDD = 0
+  const drawdowns: number[] = []
+  growthLogs.forEach((log) => {
+    if (log.pnl > peak) peak = log.pnl
+    const dd = peak - log.pnl
+    drawdowns.push(dd)
+    if (dd > maxDD) maxDD = dd
+  })
+
+  const recoveryFactor = maxDD ? (totalWin - totalLoss) / maxDD : Infinity
+  const stdDev = Math.sqrt(
+    trades.reduce((acc, t) => acc + Math.pow(t.profit - expectancy, 2), 0) / trades.length
   )
+
+  const averageTrade = trades.reduce((acc, t) => acc + t.profit, 0) / trades.length
+  const ulcerIndex = Math.sqrt(drawdowns.reduce((acc, d) => acc + Math.pow((d / peak) * 100, 2), 0) / drawdowns.length)
+  const sharpeRatio = stdDev ? averageTrade / stdDev : Infinity
+  const sortinoDenom = Math.sqrt(
+    trades.filter((t) => t.profit < 0).reduce((acc, t) => acc + Math.pow(t.profit, 2), 0) / losses.length
+  )
+  const sortinoRatio = sortinoDenom ? averageTrade / sortinoDenom : Infinity
+  const gainToPain = totalLoss ? totalWin / totalLoss : Infinity
+  const sqn = stdDev ? (averageTrade / stdDev) * Math.sqrt(trades.length) : Infinity
+
+  const grouped: Record<string, number> = {}
+  trades.forEach((t) => {
+    const d = t.date.split(' ')[0]
+    grouped[d] = (grouped[d] || 0) + t.profit
+  })
+  const sortedByDay = Object.entries(grouped).sort((a, b) => b[1] - a[1])
+  const bestDay = sortedByDay[0]
+  const worstDay = sortedByDay[sortedByDay.length - 1]
+
+   const metrics = [
+    { label: 'Número de Trades', value: trades.length, hint: 'Quantidade total de operações realizadas na conta.' },
+    { label: 'Win Rate', value: `${(winRate * 100).toFixed(2)}%`, hint: 'Porcentagem de trades com lucro. Alto valor é positivo, mas deve ser analisado junto ao risco-retorno.' },
+    { label: 'Loss Rate', value: `${(lossRate * 100).toFixed(2)}%`, hint: 'Porcentagem de trades com prejuízo. Quanto menor, melhor para o controle de risco.' },
+    { label: 'Break-even Rate', value: `${(breakevenRate * 100).toFixed(2)}%`, hint: 'Percentual de operações que terminaram sem lucro nem prejuízo.' },
+    { label: 'Média de Lucro', value: `$${avgWin.toFixed(2)}`, hint: 'Lucro médio das operações positivas. Quanto maior, melhor o desempenho das vitórias.' },
+    { label: 'Média de Prejuízo', value: `$${avgLoss.toFixed(2)}`, hint: 'Perda média das operações negativas. Valores menores indicam melhor gestão de risco.' },
+    { label: 'Expectativa por Trade', value: `$${expectancy.toFixed(2)}`, hint: 'Lucro médio esperado por operação. Deve ser positivo para indicar um sistema lucrativo.' },
+    { label: 'Profit Factor', value: profitFactor === Infinity ? '∞' : profitFactor.toFixed(2), hint: 'Relação entre lucro bruto e prejuízo bruto. Ideal acima de 1.5. Abaixo de 1 indica perdas superiores aos ganhos.' },
+    { label: 'Payoff Ratio', value: payoffRatio === Infinity ? '∞' : payoffRatio.toFixed(2), hint: 'Relação entre o lucro médio e o prejuízo médio. Valores acima de 1 indicam bom equilíbrio entre risco e retorno.' },
+    { label: 'Gain to Pain Ratio', value: gainToPain === Infinity ? '∞' : gainToPain.toFixed(2), hint: 'Lucro total dividido pela soma dos prejuízos. Valores acima de 1 mostram que o ganho compensa a dor.' },
+    { label: 'Max Drawdown', value: `$${maxDD.toFixed(2)}`, hint: 'Maior perda acumulada desde um topo. Valores menores indicam maior segurança.' },
+    { label: 'Ulcer Index', value: ulcerIndex.toFixed(2), hint: 'Mede intensidade e duração dos drawdowns. Quanto menor, mais suave a curva de capital.' },
+    { label: 'Recovery Factor', value: recoveryFactor === Infinity ? '∞' : recoveryFactor.toFixed(2), hint: 'Lucro líquido dividido pelo drawdown máximo. Ideal acima de 1.' },
+    { label: 'Sharpe Ratio', value: sharpeRatio === Infinity ? '∞' : sharpeRatio.toFixed(2), hint: 'Retorno ajustado pela volatilidade total. Bom se acima de 1, ótimo acima de 2.' },
+    { label: 'Sortino Ratio', value: sortinoRatio === Infinity ? '∞' : sortinoRatio.toFixed(2), hint: 'Similar ao Sharpe, mas considera apenas volatilidade negativa. Valores acima de 2 são muito positivos.' },
+    { label: 'Average Trade', value: `$${averageTrade.toFixed(2)}`, hint: 'Retorno médio por operação. Deve ser consistentemente positivo.' },
+    { label: 'Standard Deviation', value: `$${stdDev.toFixed(2)}`, hint: 'Volatilidade geral dos resultados. Alta variação pode indicar falta de consistência.' },
+    { label: 'SQN (System Quality)', value: sqn === Infinity ? '∞' : sqn.toFixed(2), hint: 'Índice de qualidade estatística da estratégia. Acima de 2 é bom, acima de 5 é excelente.' },
+    { label: 'Maior Lucro', value: `$${Math.max(...trades.map(t => t.profit)).toFixed(2)}`, hint: 'Trade mais lucrativo registrado.' },
+    { label: 'Maior Prejuízo', value: `$${Math.min(...trades.map(t => t.profit)).toFixed(2)}`, hint: 'Maior prejuízo individual entre todas as operações.' },
+    { label: 'Melhor Dia', value: bestDay ? `${bestDay[0]} ($${bestDay[1].toFixed(2)})` : '-', hint: 'Data com o maior lucro diário.' },
+    { label: 'Pior Dia', value: worstDay ? `${worstDay[0]} ($${worstDay[1].toFixed(2)})` : '-', hint: 'Data com o maior prejuízo diário.' },
+  ]
 
   return (
     <div className="p-6 bg-[#03182f] min-h-dvh pb-32 space-y-10">
       <div className="flex items-center gap-3 mb-4">
-        <button onClick={() => router.back()} className="text-white p-2 rounded-full hover:bg-white/10 transition">
+        <button
+          onClick={() => router.back()}
+          className="text-white p-2 rounded-full hover:bg-white/10 transition"
+        >
           <ArrowLeft className="w-5 h-5" />
         </button>
         <div className="text-white space-y-1">
           <h1 className="text-2xl font-bold leading-tight">Conta #{accountNumber}</h1>
-          <p className="text-sm text-muted-foreground">Dados carregados via JSON</p>
+          {lastUpdated && (
+            <p className="text-sm text-muted-foreground">
+              Última atualização: {new Date(lastUpdated).toLocaleString('pt-BR')}
+            </p>
+          )}
         </div>
       </div>
 
-      <Card className="bg-[#0f1d31] border border-[#1e2c46] shadow-md rounded-2xl">
-        <CardContent className="flex items-start justify-between px-4 py-6">
-          <Stat icon={DollarSign} label="Saldo atual" value={`$${currentBalance.toFixed(2)}`} />
-          <Stat icon={TrendingUp} label="PnL total" value={<span className={pnlColorClass}>${pnlTotal.toFixed(2)}</span>} />
-        </CardContent>
-      </Card>
-
-      {/* Botões estilo pill */}
-      <div className="rounded-2xl bg-[#0f1d31] shadow-md p-6 border border-[#1e2c46]">
-  <div className="flex items-center justify-between mb-4">
-    <h2 className="text-white font-semibold text-base">Evolução do {mode === 'profit' ? 'Profit' : 'Growth'}</h2>
-
-    <div className="flex gap-2 bg-[#0f1d31] p-1 rounded-full border border-[#1e2c46]">
-      <button
-        onClick={() => setMode('profit')}
-        className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all
-          ${mode === 'profit'
-            ? 'bg-[#2563eb]/20 text-white border border-[#2563eb]'
-            : 'text-[#8ca3ba] hover:text-white'}
-        `}
-      >
-        Profit
-      </button>
-      <button
-        onClick={() => setMode('growth')}
-        className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all
-          ${mode === 'growth'
-            ? 'bg-[#2563eb]/20 text-white border border-[#2563eb]'
-            : 'text-[#8ca3ba] hover:text-white'}
-        `}
-      >
-        Growth
-      </button>
-    </div>
-  </div>
-
-  <ResponsiveContainer width="100%" height={300}>
-    <LineChart data={selectedLogs} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
-      <CartesianGrid stroke="#1e2c46" strokeDasharray="3 3" vertical={false} />
-      <XAxis hide />
-      <YAxis
-        stroke="#1f2c44"
-        fontSize={12}
-        tickLine={false}
-        axisLine={false}
-        domain={['dataMin - 2000', 'dataMax + 2000']}
-        tickFormatter={(v) =>
-          `$${Math.abs(v) >= 1000 ? (v / 1000).toFixed(1) + 'K' : v.toFixed(0)}`
-        }
-      />
-      <Tooltip
-        content={({ active, payload }) => {
-          if (!active || !payload || payload.length === 0) return null
-          const log = payload[0].payload as Log
-          const colorClass = log.pnl >= 0 ? 'text-green-400' : 'text-red-400'
-          return (
-            <div className="bg-[#1f2c44] text-white p-3 rounded-md shadow">
-              <div className="text-sm font-medium">{log.date}</div>
-              <div className={`text-xs font-medium ${colorClass}`}>
-                PnL acumulado: ${log.pnl.toFixed(2)}
-              </div>
-            </div>
-          )
-        }}
-      />
-      <Line
-        type="monotone"
-        dataKey="pnl"
-        stroke="#3b82f6"
-        strokeWidth={2.5}
-        dot={false}
-        activeDot={false}
-        animationDuration={500}
-      />
-    </LineChart>
-  </ResponsiveContainer>
-</div>
-
-<Card className="bg-[#0f1d31] border border-[#1e2c46] shadow-md rounded-2xl">
-  <CardContent className="px-4 py-6 space-y-4">
-    <h3 className="text-white font-semibold text-base">Métricas Avançadas</h3>
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 text-sm text-white">
-      {(() => {
-        const wins = trades.filter(t => t.profit > 0)
-        const losses = trades.filter(t => t.profit < 0)
-        const breakevens = trades.filter(t => t.profit === 0)
-
-        const winCount = wins.length
-        const lossCount = losses.length
-        const breakevenCount = breakevens.length
-        const total = winCount + lossCount + breakevenCount
-
-        const totalTrades = trades.length
-        const winRate = total ? winCount / total : 0
-        const lossRate = total ? lossCount / total : 0
-        const breakevenRate = total ? breakevenCount / total : 0
-
-        const avgWin = winCount ? wins.reduce((acc, t) => acc + t.profit, 0) / winCount : 0
-        const avgLoss = lossCount ? Math.abs(losses.reduce((acc, t) => acc + t.profit, 0) / lossCount) : 0
-        const totalWin = wins.reduce((acc, t) => acc + t.profit, 0)
-        const totalLoss = Math.abs(losses.reduce((acc, t) => acc + t.profit, 0))
-        const expectancy = (winRate * avgWin) - (lossRate * avgLoss)
-        const profitFactor = totalLoss ? totalWin / totalLoss : Infinity
-        const payoffRatio = avgLoss ? avgWin / avgLoss : Infinity
-
-        // drawdown
-        let peak = growthLogs[0]?.pnl ?? 0
-        let maxDD = 0
-        growthLogs.forEach(log => {
-          if (log.pnl > peak) peak = log.pnl
-          const dd = peak - log.pnl
-          if (dd > maxDD) maxDD = dd
-        })
-
-        const recoveryFactor = maxDD ? (totalWin - totalLoss) / maxDD : Infinity
-
-        // melhores/piores dias
-        const grouped: Record<string, number> = {}
-        trades.forEach(t => {
-          const d = t.date.split(' ')[0]
-          grouped[d] = (grouped[d] || 0) + t.profit
-        })
-        const sortedByDay = Object.entries(grouped).sort((a, b) => b[1] - a[1])
-        const bestDay = sortedByDay[0]
-        const worstDay = sortedByDay[sortedByDay.length - 1]
-
-        return [
-          { label: 'Número de Trades', value: totalTrades },
-          { label: 'Win Rate', value: `${(winRate * 100).toFixed(2)}%` },
-          { label: 'Loss Rate', value: `${(lossRate * 100).toFixed(2)}%` },
-          { label: 'Break-even Rate', value: `${(breakevenRate * 100).toFixed(2)}%` },
-          { label: 'Média de Lucro', value: `$${avgWin.toFixed(2)}` },
-          { label: 'Média de Prejuízo', value: `$${avgLoss.toFixed(2)}` },
-          { label: 'Expectativa por Trade', value: `$${expectancy.toFixed(2)}` },
-          { label: 'Profit Factor', value: profitFactor === Infinity ? '∞' : profitFactor.toFixed(2) },
-          { label: 'Payoff Ratio', value: payoffRatio === Infinity ? '∞' : payoffRatio.toFixed(2) },
-          { label: 'Drawdown Máximo', value: `$${maxDD.toFixed(2)}` },
-          { label: 'Recovery Factor', value: recoveryFactor === Infinity ? '∞' : recoveryFactor.toFixed(2) },
-          { label: 'Maior Lucro', value: `$${Math.max(...trades.map(t => t.profit)).toFixed(2)}` },
-          { label: 'Maior Prejuízo', value: `$${Math.min(...trades.map(t => t.profit)).toFixed(2)}` },
-          { label: 'Melhor Dia', value: bestDay ? `${bestDay[0]} ($${bestDay[1].toFixed(2)})` : '-' },
-          { label: 'Pior Dia', value: worstDay ? `${worstDay[0]} ($${worstDay[1].toFixed(2)})` : '-' },
-        ].map((m, idx) => (
-          <div key={idx}>
-            <p className="text-muted-foreground">{m.label}</p>
-            <p className="font-semibold">{m.value}</p>
-          </div>
-        ))
-      })()}
-    </div>
-  </CardContent>
-</Card>
-
-      <Card className="bg-[#0f1d31] border border-[#1e2c46] shadow-md rounded-2xl">
-        <CardContent className="space-y-4">
-          <h3 className="text-white font-semibold text-base">Resumo por Ativo</h3>
-          {Object.values(statsBySymbol).map((s) => (
-            <div key={s.symbol} className="flex justify-between text-sm text-white border-b border-[#1e2c46] pb-2">
-              <span>{s.symbol}</span>
-              <span className="text-right">{s.trades} trades • Vol: {s.volume.toFixed(2)} • <span className={s.profit >= 0 ? 'text-green-400' : 'text-red-400'}>${s.profit.toFixed(2)}</span></span>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
-
-      <Card className="bg-[#0f1d31] border border-[#1e2c46] shadow-md rounded-2xl">
-        <CardContent className="pt-6 px-6 pb-4">
-          <h3 className="text-white font-semibold text-base mb-4">Histórico de Trades</h3>
-          <div className="max-h-[400px] overflow-y-auto">
-            <table className="w-full text-sm text-left border-separate border-spacing-0">
-              <thead className="sticky top-0 z-10 bg-[#0f1d31]">
-                <tr className="text-muted-foreground border-b border-[#1f2c44]">
-                  <th className="py-2 sticky top-0 bg-[#0f1d31]">Data</th>
-                  <th className="py-2 sticky top-0 bg-[#0f1d31]">Ativo</th>
-                  <th className="py-2 sticky top-0 bg-[#0f1d31]">Tipo</th>
-                  <th className="py-2 text-right sticky top-0 bg-[#0f1d31]">Volume</th>
-                  <th className="py-2 text-right sticky top-0 bg-[#0f1d31]">Lucro</th>
-                </tr>
-              </thead>
-              <tbody>
-                {trades.map((t, idx) => (
-                  <tr key={idx} className="border-t border-[#1f2c44] hover:bg-[#131f35] transition-colors">
-                    <td className="py-2 text-white whitespace-nowrap">{t.date}</td>
-                    <td className="text-white whitespace-nowrap">{t.symbol}</td>
-                    <td className="text-white capitalize whitespace-nowrap">{t.type}</td>
-                    <td className="text-right text-white whitespace-nowrap">{t.volume}</td>
-                    <td className={`text-right font-semibold whitespace-nowrap ${t.profit > 0 ? 'text-green-400' : t.profit < 0 ? 'text-red-400' : 'text-muted-foreground'}`}>{t.profit.toFixed(2)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+      <AccountResumeCard currentBalance={currentBalance} pnlTotal={pnlTotal} />
+      <AccountChartCard mode={mode} onChangeMode={setMode} logs={mode === 'profit' ? logs : growthLogs} />
+      <AccountMetricsCard metrics={metrics} />
+      <AccountSymbolsChart data={Object.values(statsBySymbol)} />
+      <AccountHistoryCard trades={trades} />
     </div>
   )
 }

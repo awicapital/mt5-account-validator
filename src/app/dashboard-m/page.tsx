@@ -2,8 +2,18 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
-import { format, addMonths, subMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameMonth, isToday } from "date-fns";
+import {
+  format,
+  addMonths,
+  subMonths,
+  startOfMonth,
+  endOfMonth,
+  startOfWeek,
+  endOfWeek,
+  addDays,
+  isSameMonth,
+  isToday,
+} from "date-fns";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -20,53 +30,88 @@ import { Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 
-type Account = {
+interface Account {
   id: string;
   account_number: string;
   balance: number | null;
   ea_name?: string;
   is_active: boolean;
-};
+}
+interface Trade {
+  date: string;
+  profit: number;
+  type: string;
+}
 
 export default function MobileDashboardPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [email, setEmail] = useState("");
+  const [userName, setUserName] = useState("");
   const [requestDialogOpen, setRequestDialogOpen] = useState(false);
   const [accountNumber, setAccountNumber] = useState("");
-  const [email, setEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [calendarDate, setCalendarDate] = useState(new Date());
-
-  const fetchAccounts = async (userEmail: string) => {
-    const { data, error } = await supabase.from("accounts").select("*").eq("email", userEmail);
-    if (!error && data) setAccounts(data as Account[]);
-  };
+  const [pnlByDate, setPnlByDate] = useState<Record<string, number>>({});
+  const [tradesByDate, setTradesByDate] = useState<Record<string, number>>({});
 
   useEffect(() => {
-    const initialize = async () => {
-      const { data: user, error: userError } = await supabase.auth.getUser();
-      if (userError || !user?.user?.email) {
+    const init = async () => {
+      const { data: user, error } = await supabase.auth.getUser();
+      if (error || !user.user?.email) {
         router.push("/login");
         return;
       }
+
       const userEmail = user.user.email;
       setEmail(userEmail);
-      await fetchAccounts(userEmail);
+      setUserName(user.user.user_metadata?.name || "");
+
+      const { data: accountsData } = await supabase
+        .from("accounts")
+        .select("*")
+        .eq("email", userEmail);
+
+      if (accountsData) {
+        setAccounts(accountsData as Account[]);
+        await fetchPNL(accountsData as Account[]);
+      }
+
       setLoading(false);
     };
-    initialize();
+    init();
   }, [router]);
 
-  const handleDelete = async () => {
-    if (!selectedAccount) return;
-    setDialogOpen(false);
-    await supabase.from("accounts").delete().eq("id", selectedAccount.id);
-    await fetchAccounts(email);
-    toast.success("Conta excluída com sucesso!");
-    setSelectedAccount(null);
+  const fetchPNL = async (accounts: Account[]) => {
+    const allTrades: Trade[] = [];
+
+    await Promise.all(
+      accounts.map(async (acc) => {
+        const path = `${acc.account_number}.json`;
+        const { data: urlData } = supabase.storage.from("logs").getPublicUrl(path);
+        if (!urlData?.publicUrl) return;
+
+        try {
+          const res = await fetch(urlData.publicUrl);
+          if (!res.ok) return;
+          const trades: Trade[] = await res.json();
+          allTrades.push(...trades.filter((t) => t.type !== "deposit"));
+        } catch {}
+      })
+    );
+
+    const pnl: Record<string, number> = {};
+    const tradeCounts: Record<string, number> = {};
+
+    allTrades.forEach((t) => {
+      const date = format(new Date(t.date), "yyyy-MM-dd");
+      pnl[date] = (pnl[date] || 0) + t.profit;
+      tradeCounts[date] = (tradeCounts[date] || 0) + 1;
+    });
+
+    setPnlByDate(pnl);
+    setTradesByDate(tradeCounts);
   };
 
   const handleSubmit = async () => {
@@ -74,6 +119,7 @@ export default function MobileDashboardPage() {
       toast.error("Informe o número da conta.");
       return;
     }
+
     setSubmitting(true);
     const { error } = await supabase.from("accounts").insert({
       account_number: Number(accountNumber),
@@ -83,14 +129,33 @@ export default function MobileDashboardPage() {
     });
     setSubmitting(false);
 
-    if (error) {
-      toast.error("Erro ao solicitar conta.");
-    } else {
+    if (!error) {
+      toast.success("Solicitação enviada com sucesso!");
       setRequestDialogOpen(false);
       setAccountNumber("");
       await fetchAccounts(email);
-      toast.success("Solicitação enviada com sucesso!");
+    } else {
+      toast.error("Erro ao solicitar conta.");
     }
+  };
+
+  const fetchAccounts = async (userEmail: string) => {
+    const { data } = await supabase
+      .from("accounts")
+      .select("*")
+      .eq("email", userEmail);
+    if (data) setAccounts(data as Account[]);
+  };
+
+  const formatShortCurrency = (value: number) => {
+    const abs = Math.abs(value);
+    let formatted = abs >= 1e6
+      ? `${(abs / 1e6).toFixed(1).replace(/\.0$/, "")}M`
+      : abs >= 1e3
+      ? `${(abs / 1e3).toFixed(1).replace(/\.0$/, "")}K`
+      : abs.toFixed(0);
+
+    return `${value > 0 ? "+" : "-"}$${formatted}`;
   };
 
   const renderCalendar = () => {
@@ -98,8 +163,8 @@ export default function MobileDashboardPage() {
     const endMonth = endOfMonth(calendarDate);
     const startDate = startOfWeek(startMonth);
     const endDate = endOfWeek(endMonth);
-
     const days = [];
+
     let current = startDate;
     while (current <= endDate) {
       days.push(current);
@@ -116,19 +181,58 @@ export default function MobileDashboardPage() {
         {days.map((day, i) => {
           const isCurrentMonth = isSameMonth(day, calendarDate);
           const isCurrentDay = isToday(day);
+          const key = format(day, "yyyy-MM-dd");
+
+          if (!isCurrentMonth) {
+            return (
+              <div
+                key={i}
+                className="aspect-square flex items-center justify-center rounded-md text-muted-foreground border border-transparent text-xs"
+              >
+                {format(day, "d")}
+              </div>
+            );
+          }
+
+          const pnl = pnlByDate[key] ?? 0;
+          const tradesCount = tradesByDate[key] ?? 0;
+
+          const bgClass =
+            pnl > 0
+              ? "bg-[#10382c] border-[#00ff99]"
+              : pnl < 0
+              ? "bg-[#3f1f1f] border-[#ff4c4c]"
+              : isCurrentDay
+              ? "bg-[#268bff] border-[#268bff]"
+              : "bg-[#1e2b45] border-[#1f2c44]";
+
+          const pnlClass =
+            pnl > 0
+              ? "text-[#00ff99]"
+              : pnl < 0
+              ? "text-[#ff4c4c]"
+              : "text-white/40";
 
           return (
             <div
               key={i}
-              className={`aspect-square flex items-center justify-center rounded-md text-white text-sm font-medium border ${
-                isCurrentMonth
-                  ? isCurrentDay
-                    ? "bg-[#268bff] border-[#268bff] text-white"
-                    : "bg-[#1e2b45] border-[#1f2c44]"
-                  : "bg-transparent border-transparent text-muted-foreground"
-              }`}
+              className={`aspect-square relative rounded-md border p-1 text-white ${bgClass}`}
             >
-              {format(day, "d")}
+              <div className="absolute top-1 right-1 text-[10px] text-white/70">
+                {format(day, "d")}
+              </div>
+              {pnl !== 0 && (
+                <div className="absolute inset-0 flex items-center justify-center px-1">
+                  <div className={`text-[11px] leading-tight ${pnlClass}`}>
+                    {formatShortCurrency(pnl)}
+                  </div>
+                </div>
+              )}
+              {tradesCount > 0 && (
+                <div className="absolute bottom-1 right-1 text-[10px] text-white/50">
+                  {tradesCount} trade{tradesCount > 1 && "s"}
+                </div>
+              )}
             </div>
           );
         })}
@@ -145,30 +249,48 @@ export default function MobileDashboardPage() {
   }
 
   return (
-    <div className="p-4 space-y-6 bg-[#03182f] min-h-dvh pb-28 relative">
+    <div className="p-4 space-y-6 bg-[#03182f] min-h-dvh pb-28">
       <h1 className="text-lg font-semibold text-white">Panorama Geral</h1>
 
-      <div className="grid grid-cols-2 gap-4">
-        <motion.div className="w-full h-32 rounded-xl bg-[#0a294d] text-white flex flex-col items-center justify-center font-semibold text-sm">
-          <div className="text-muted-foreground text-xs">Contas Ativas</div>
-          <div className="text-3xl font-bold text-green-400">{accounts.filter(a => a.is_active).length}</div>
-        </motion.div>
-        <motion.div className="w-full h-32 rounded-xl bg-[#0a294d] text-white flex flex-col items-center justify-center font-semibold text-sm">
-          <div className="text-muted-foreground text-xs">Contas Pendentes</div>
-          <div className="text-3xl font-bold text-yellow-400">{accounts.filter(a => !a.is_active).length}</div>
-        </motion.div>
+      {/* Card do usuário */}
+      <div className="rounded-xl bg-[#03182f] border border-[#1e2b45] px-4 py-3 text-white">
+        <div className="flex flex-col text-sm space-y-1">
+          {userName && <span className="font-semibold text-base">{userName}</span>}
+          <span className="text-white/70 text-xs">{email}</span>
+          <div className="flex gap-4 text-xs pt-1">
+            <span className="text-green-400">
+              {accounts.filter((a) => a.is_active).length} conta(s) ativa(s)
+            </span>
+            {accounts.some((a) => !a.is_active) && (
+              <span className="text-yellow-400">
+                {accounts.filter((a) => !a.is_active).length} pendente(s)
+              </span>
+            )}
+          </div>
+        </div>
       </div>
 
+      {/* Calendário */}
       <div className="space-y-4 pt-4">
         <h2 className="text-white font-semibold text-lg">Calendário</h2>
         <Card className="bg-[#03182f] border-none">
           <CardContent className="p-4 space-y-4">
             <div className="flex items-center justify-between">
-              <Button size="icon" variant="ghost" onClick={() => setCalendarDate(subMonths(calendarDate, 1))}>
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => setCalendarDate(subMonths(calendarDate, 1))}
+              >
                 <ChevronLeft />
               </Button>
-              <div className="text-white font-semibold">{format(calendarDate, "MMMM yyyy")}</div>
-              <Button size="icon" variant="ghost" onClick={() => setCalendarDate(addMonths(calendarDate, 1))}>
+              <div className="text-white font-semibold">
+                {format(calendarDate, "MMMM yyyy")}
+              </div>
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => setCalendarDate(addMonths(calendarDate, 1))}
+              >
                 <ChevronRight />
               </Button>
             </div>
@@ -177,13 +299,7 @@ export default function MobileDashboardPage() {
         </Card>
       </div>
 
-      <div className="space-y-4 pt-4">
-        <h2 className="text-white font-semibold text-lg">Novidades</h2>
-        <motion.div className="w-full h-32 rounded-xl bg-[#0a294d] text-white flex items-center justify-center font-semibold text-sm">
-          Slide de divulgação #1
-        </motion.div>
-      </div>
-
+      {/* Modal de nova conta */}
       <Dialog open={requestDialogOpen} onOpenChange={setRequestDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -191,9 +307,6 @@ export default function MobileDashboardPage() {
               Solicitar nova conta
             </DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-muted-foreground text-center mt-1 mb-5">
-            Informe o número da conta MT5 que deseja vincular.
-          </p>
           <div className="space-y-2">
             <Label htmlFor="account" className="text-white">
               Número da Conta
@@ -201,14 +314,13 @@ export default function MobileDashboardPage() {
             <Input
               id="account"
               type="number"
-              placeholder="Ex: 123456"
               value={accountNumber}
               onChange={(e) => setAccountNumber(e.target.value)}
             />
           </div>
-          <DialogFooter className="flex justify-center mt-6">
+          <DialogFooter className="flex justify-center mt-4">
             <Button
-              className="bg-[#268bff] hover:bg-[#1e78e0] text-white w-full"
+              className="bg-[#268bff] text-white w-full"
               onClick={handleSubmit}
               disabled={submitting}
             >

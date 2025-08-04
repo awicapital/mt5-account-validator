@@ -35,14 +35,7 @@ export default function LoginPage() {
       toast.error("Email ou senha inválidos.");
     } else {
       toast.success("Login realizado com sucesso!");
-
-      if (email === "contato@awi.capital") {
-        router.push("/admin/dashboard");
-      } else {
-        const isMobile =
-          typeof window !== "undefined" && window.innerWidth < 768;
-        router.push(isMobile ? "/dashboard-m" : "/dashboard");
-      }
+      router.push("/dashboard-m");
     }
 
     setLoading(false);
