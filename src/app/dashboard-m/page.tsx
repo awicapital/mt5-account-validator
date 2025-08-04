@@ -149,7 +149,7 @@ export default function MobileDashboardPage() {
 
   const formatShortCurrency = (value: number) => {
     const abs = Math.abs(value);
-    let formatted = abs >= 1e6
+    const formatted = abs >= 1e6
       ? `${(abs / 1e6).toFixed(1).replace(/\.0$/, "")}M`
       : abs >= 1e3
       ? `${(abs / 1e3).toFixed(1).replace(/\.0$/, "")}K`
