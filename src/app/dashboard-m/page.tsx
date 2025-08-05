@@ -56,7 +56,12 @@ export default function DashboardMPage() {
       const parsed: DailyPnL[] = Object.entries(accountsData.dailyPnls).map(
         ([date, pnl]) => ({
           date: date.replaceAll(".", "-"),
-          pnl: typeof pnl === "number" ? pnl : Object.values(pnl).reduce((sum, val) => sum + val, 0),
+          pnl: typeof pnl === "number"
+            ? pnl
+            : Object.values(pnl as Record<string, number>).reduce(
+                (sum, val) => sum + val,
+                0
+              ),
         })
       );
 
