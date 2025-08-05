@@ -21,6 +21,7 @@ export default function DashboardMPage() {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [dailyPnls, setDailyPnls] = useState<DailyPnL[]>([]);
   const [totalTrades, setTotalTrades] = useState<number>(0);
+  const [hasAccountData, setHasAccountData] = useState<boolean>(false);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
@@ -48,25 +49,27 @@ export default function DashboardMPage() {
       setUser(profile);
 
       const accountsData = await fetchAccountsData();
-      if (!accountsData) {
-        setLoading(false);
-        return;
+
+      if (accountsData && accountsData.dailyPnls && accountsData.trades) {
+        const parsed: DailyPnL[] = Object.entries(accountsData.dailyPnls).map(
+          ([date, pnl]) => ({
+            date: date.replaceAll(".", "-"),
+            pnl: typeof pnl === "number"
+              ? pnl
+              : Object.values(pnl as Record<string, number>).reduce(
+                  (sum, val) => sum + val,
+                  0
+                ),
+          })
+        );
+
+        setDailyPnls(parsed);
+        setTotalTrades(accountsData.trades.length);
+        setHasAccountData(true);
+      } else {
+        setHasAccountData(false);
       }
 
-      const parsed: DailyPnL[] = Object.entries(accountsData.dailyPnls).map(
-        ([date, pnl]) => ({
-          date: date.replaceAll(".", "-"),
-          pnl: typeof pnl === "number"
-            ? pnl
-            : Object.values(pnl as Record<string, number>).reduce(
-                (sum, val) => sum + val,
-                0
-              ),
-        })
-      );
-
-      setDailyPnls(parsed);
-      setTotalTrades(accountsData.trades.length);
       setLoading(false);
     };
 
@@ -98,7 +101,15 @@ export default function DashboardMPage() {
         avatarUrl={user.avatar_url || undefined}
       />
 
-      <DashboardCalendar dailyPnls={dailyPnls} />
+      <div className={hasAccountData ? "" : "opacity-30 pointer-events-none"}>
+        <DashboardCalendar dailyPnls={dailyPnls} />
+      </div>
+
+      {!hasAccountData && (
+        <p className="text-center text-sm text-white/70">
+          Aguardando dados das contas...
+        </p>
+      )}
     </div>
   );
 }
