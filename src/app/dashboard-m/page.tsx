@@ -12,6 +12,7 @@ interface Account {
   balance: number | null;
   ea_name?: string;
   is_active: boolean;
+  pnl_total?: number;
 }
 
 export default function MobileDashboardPage() {
@@ -40,10 +41,43 @@ export default function MobileDashboardPage() {
         .select("*")
         .eq("email", userEmail);
 
-      if (accountsData) {
-        setAccounts(accountsData as Account[]);
+      if (!accountsData) {
+        setLoading(false);
+        return;
       }
 
+      const enhancedAccounts = await Promise.all(
+        accountsData.map(async (account: Account) => {
+          try {
+            const path = `${account.account_number}.json`;
+            const { data: urlData } = supabase.storage.from("logs").getPublicUrl(path);
+            if (!urlData?.publicUrl) return account;
+
+            const res = await fetch(urlData.publicUrl);
+            if (!res.ok) return account;
+
+            const trades: { profit: number; type: string; date: string }[] = await res.json();
+            let pnl = 0;
+
+            for (const trade of trades) {
+              if (trade.type !== "deposit") {
+                pnl += trade.profit;
+              }
+            }
+
+            return {
+              ...account,
+              pnl_total: pnl,
+            };
+          } catch (error) {
+            console.error("Erro ao calcular PNL:", error);
+            return account;
+          }
+        })
+      );
+
+      console.log("Contas carregadas com PNL:", enhancedAccounts);
+      setAccounts(enhancedAccounts);
       setLoading(false);
     };
 
@@ -62,11 +96,10 @@ export default function MobileDashboardPage() {
     <div className="p-4 pt-2 space-y-6 bg-[#03182f] min-h-dvh pb-28">
       <h1 className="text-lg font-semibold text-white">Calendário</h1>
 
-      {/* Debug opcional */}
-      {/* <div className="text-xs text-white">
+      <div className="text-xs text-white/50">
         <div>Email: {email}</div>
-        <div>Contas: {accounts.length}</div>
-      </div> */}
+        <div>Contas carregadas: {accounts.length}</div>
+      </div>
 
       {email && accounts.length > 0 ? (
         <CalendarPNL email={email} accounts={accounts} />
