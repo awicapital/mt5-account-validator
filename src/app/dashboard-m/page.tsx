@@ -241,7 +241,7 @@ export default function MobileDashboardPage() {
 
   if (loading) {
     return (
-      <div className="h-full flex items-center justify-center">
+      <div className="min-h-dvh flex items-center justify-center">
         <Loader2 className="animate-spin w-6 h-6 text-white" />
       </div>
     );
