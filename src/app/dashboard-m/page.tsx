@@ -59,8 +59,15 @@ export default function MobileDashboardPage() {
   }
 
   return (
-    <div className="p-4 space-y-6 bg-[#03182f] min-h-dvh pb-28">
+    <div className="p-4 pt-2 space-y-6 bg-[#03182f] min-h-dvh pb-28">
       <h1 className="text-lg font-semibold text-white">Calendário</h1>
+
+      {/* Debug opcional */}
+      {/* <div className="text-xs text-white">
+        <div>Email: {email}</div>
+        <div>Contas: {accounts.length}</div>
+      </div> */}
+
       {email && accounts.length > 0 ? (
         <CalendarPNL email={email} accounts={accounts} />
       ) : (
