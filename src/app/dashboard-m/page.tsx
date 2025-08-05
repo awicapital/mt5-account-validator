@@ -1,12 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
-import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
+
+import { supabase } from "@/lib/supabase";
+import { fetchAccountsData, Trade } from "@/lib/accountsData";
 import { DashboardUserCard } from "@/components/ui/dashboard-user-card";
+import { DashboardCalendar, DailyPnL } from "@/components/ui/dashboard-calendar";
 
 interface UserProfile {
+  id: string;
   full_name?: string;
   email: string;
   access_level?: string;
@@ -15,26 +19,53 @@ interface UserProfile {
 
 export default function DashboardMPage() {
   const [user, setUser] = useState<UserProfile | null>(null);
+  const [dailyPnls, setDailyPnls] = useState<DailyPnL[]>([]);
+  const [totalTrades, setTotalTrades] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
-    const fetchUser = async () => {
+    const fetchDashboardData = async () => {
       const { data: session } = await supabase.auth.getUser();
       const email = session?.user?.email;
-      if (!email) return router.push("/login");
 
-      const { data: profile } = await supabase
+      if (!email) {
+        router.push("/login");
+        return;
+      }
+
+      const { data: profile, error: profileError } = await supabase
         .from("users")
-        .select("full_name, email, access_level, avatar_url")
+        .select("id, full_name, email, access_level, avatar_url")
         .eq("email", email)
         .single();
 
-      if (profile) setUser(profile);
+      if (profileError || !profile) {
+        setLoading(false);
+        return;
+      }
+
+      setUser(profile);
+
+      const accountsData = await fetchAccountsData();
+      if (!accountsData) {
+        setLoading(false);
+        return;
+      }
+
+      const parsed: DailyPnL[] = Object.entries(accountsData.dailyPnls).map(
+        ([date, pnl]) => ({
+          date: date.replaceAll(".", "-"),
+          pnl: typeof pnl === "number" ? pnl : Object.values(pnl).reduce((sum, val) => sum + val, 0),
+        })
+      );
+
+      setDailyPnls(parsed);
+      setTotalTrades(accountsData.trades.length);
       setLoading(false);
     };
 
-    fetchUser();
+    fetchDashboardData();
   }, [router]);
 
   if (loading) {
@@ -54,13 +85,15 @@ export default function DashboardMPage() {
   }
 
   return (
-    <div className="p-4 bg-[#03182f] min-h-dvh pb-28">
+    <div className="p-4 bg-[#03182f] min-h-dvh pb-28 space-y-6 text-white">
       <DashboardUserCard
         name={user.full_name}
         email={user.email}
         role={user.access_level}
         avatarUrl={user.avatar_url || undefined}
       />
+
+      <DashboardCalendar dailyPnls={dailyPnls} />
     </div>
   );
 }
