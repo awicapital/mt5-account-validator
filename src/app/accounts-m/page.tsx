@@ -120,26 +120,24 @@ export default function AccountsPage() {
       data.map(async (account: Account) => {
         try {
           const path = `${account.account_number}.json`;
-          const { data: urlData, error: urlError } = supabase.storage.from("logs").getPublicUrl(path);
-          if (urlError || !urlData?.publicUrl) return account;
+          const { data: urlData } = supabase.storage.from("logs").getPublicUrl(path);
+          if (!urlData?.publicUrl) return account;
 
           const res = await fetch(urlData.publicUrl);
           if (!res.ok) return account;
 
           const trades: { profit: number; type: string; date: string }[] = await res.json();
-          const pnlLogs: number[] = [];
-
           let pnl = 0;
+
           for (const trade of trades) {
             if (trade.type !== "deposit") {
               pnl += trade.profit;
-              pnlLogs.push(pnl);
             }
           }
 
           return {
             ...account,
-            pnl_total: pnlLogs.at(-1) || 0,
+            pnl_total: pnl,
           };
         } catch {
           return account;
