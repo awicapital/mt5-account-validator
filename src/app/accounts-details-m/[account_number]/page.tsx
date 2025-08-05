@@ -35,9 +35,8 @@ interface Summary {
 
 export default function AccountDetailsPage() {
   const { account_number } = useParams<{ account_number: string }>()
-  const router = useRouter()
   const accountNumber = Number(account_number)
-
+  const router = useRouter()
   const [logs, setLogs] = useState<Log[]>([])
   const [growthLogs, setGrowthLogs] = useState<Log[]>([])
   const [trades, setTrades] = useState<Trade[]>([])
@@ -70,7 +69,6 @@ export default function AccountDetailsPage() {
 
         const res = await fetch(urlData.publicUrl)
         if (!res.ok) throw new Error('Erro ao baixar arquivo JSON público.')
-
         const rawTrades: Trade[] = await res.json()
 
         const growth: Log[] = []
@@ -127,8 +125,8 @@ export default function AccountDetailsPage() {
     )
   }
 
-  const currentBalance = growthLogs.at(-1)?.pnl ?? 0
-  const pnlTotal = logs.at(-1)?.pnl ?? 0
+  const currentBalance = growthLogs.at(-1)?.pnl || 0
+  const pnlTotal = logs.at(-1)?.pnl || 0
 
   const statsBySymbol = trades.reduce<Record<string, Summary>>((acc, t) => {
     acc[t.symbol] ||= { symbol: t.symbol, volume: 0, trades: 0, profit: 0 }
@@ -190,28 +188,28 @@ export default function AccountDetailsPage() {
   const worstDay = sortedByDay.at(-1)
 
   const metrics = [
-    { label: 'Número de Trades', value: trades.length },
-    { label: 'Win Rate', value: `${(winRate * 100).toFixed(2)}%` },
-    { label: 'Loss Rate', value: `${(lossRate * 100).toFixed(2)}%` },
-    { label: 'Break-even Rate', value: `${(breakevenRate * 100).toFixed(2)}%` },
-    { label: 'Média de Lucro', value: `$${avgWin.toFixed(2)}` },
-    { label: 'Média de Prejuízo', value: `$${avgLoss.toFixed(2)}` },
-    { label: 'Expectativa por Trade', value: `$${expectancy.toFixed(2)}` },
-    { label: 'Profit Factor', value: profitFactor === Infinity ? '∞' : profitFactor.toFixed(2) },
-    { label: 'Payoff Ratio', value: payoffRatio === Infinity ? '∞' : payoffRatio.toFixed(2) },
-    { label: 'Gain to Pain Ratio', value: gainToPain === Infinity ? '∞' : gainToPain.toFixed(2) },
-    { label: 'Max Drawdown', value: `$${maxDD.toFixed(2)}` },
-    { label: 'Ulcer Index', value: ulcerIndex.toFixed(2) },
-    { label: 'Recovery Factor', value: recoveryFactor === Infinity ? '∞' : recoveryFactor.toFixed(2) },
-    { label: 'Sharpe Ratio', value: sharpeRatio === Infinity ? '∞' : sharpeRatio.toFixed(2) },
-    { label: 'Sortino Ratio', value: sortinoRatio === Infinity ? '∞' : sortinoRatio.toFixed(2) },
-    { label: 'Average Trade', value: `$${averageTrade.toFixed(2)}` },
-    { label: 'Standard Deviation', value: `$${stdDev.toFixed(2)}` },
-    { label: 'SQN (System Quality)', value: sqn === Infinity ? '∞' : sqn.toFixed(2) },
-    { label: 'Maior Lucro', value: `$${Math.max(...trades.map(t => t.profit)).toFixed(2)}` },
-    { label: 'Maior Prejuízo', value: `$${Math.min(...trades.map(t => t.profit)).toFixed(2)}` },
-    { label: 'Melhor Dia', value: bestDay ? `${bestDay[0]} ($${bestDay[1].toFixed(2)})` : '-' },
-    { label: 'Pior Dia', value: worstDay ? `${worstDay[0]} ($${worstDay[1].toFixed(2)})` : '-' },
+    { label: 'Número de Trades', value: trades.length, hint: 'Quantidade total de operações realizadas na conta.' },
+    { label: 'Win Rate', value: `${(winRate * 100).toFixed(2)}%`, hint: 'Porcentagem de trades com lucro.' },
+    { label: 'Loss Rate', value: `${(lossRate * 100).toFixed(2)}%`, hint: 'Porcentagem de trades com prejuízo.' },
+    { label: 'Break-even Rate', value: `${(breakevenRate * 100).toFixed(2)}%`, hint: 'Percentual de empates (sem lucro ou prejuízo).' },
+    { label: 'Média de Lucro', value: `$${avgWin.toFixed(2)}`, hint: 'Lucro médio das operações positivas.' },
+    { label: 'Média de Prejuízo', value: `$${avgLoss.toFixed(2)}`, hint: 'Prejuízo médio das operações negativas.' },
+    { label: 'Expectativa por Trade', value: `$${expectancy.toFixed(2)}`, hint: 'Lucro esperado por operação.' },
+    { label: 'Profit Factor', value: profitFactor === Infinity ? '∞' : profitFactor.toFixed(2), hint: 'Lucro bruto dividido pelo prejuízo bruto.' },
+    { label: 'Payoff Ratio', value: payoffRatio === Infinity ? '∞' : payoffRatio.toFixed(2), hint: 'Lucro médio / prejuízo médio.' },
+    { label: 'Gain to Pain Ratio', value: gainToPain === Infinity ? '∞' : gainToPain.toFixed(2), hint: 'Lucro total dividido pelas perdas totais.' },
+    { label: 'Max Drawdown', value: `$${maxDD.toFixed(2)}`, hint: 'Maior queda acumulada desde um topo.' },
+    { label: 'Ulcer Index', value: ulcerIndex.toFixed(2), hint: 'Índice que mede profundidade e duração dos drawdowns.' },
+    { label: 'Recovery Factor', value: recoveryFactor === Infinity ? '∞' : recoveryFactor.toFixed(2), hint: 'Lucro líquido dividido pelo drawdown máximo.' },
+    { label: 'Sharpe Ratio', value: sharpeRatio === Infinity ? '∞' : sharpeRatio.toFixed(2), hint: 'Retorno ajustado pela volatilidade.' },
+    { label: 'Sortino Ratio', value: sortinoRatio === Infinity ? '∞' : sortinoRatio.toFixed(2), hint: 'Retorno ajustado pela volatilidade negativa.' },
+    { label: 'Average Trade', value: `$${averageTrade.toFixed(2)}`, hint: 'Média de lucro/prejuízo por trade.' },
+    { label: 'Standard Deviation', value: `$${stdDev.toFixed(2)}`, hint: 'Desvio padrão dos resultados.' },
+    { label: 'SQN (System Quality)', value: sqn === Infinity ? '∞' : sqn.toFixed(2), hint: 'Índice de qualidade estatística da estratégia.' },
+    { label: 'Maior Lucro', value: `$${Math.max(...trades.map(t => t.profit)).toFixed(2)}`, hint: 'Trade mais lucrativo registrado.' },
+    { label: 'Maior Prejuízo', value: `$${Math.min(...trades.map(t => t.profit)).toFixed(2)}`, hint: 'Maior prejuízo registrado.' },
+    { label: 'Melhor Dia', value: bestDay ? `${bestDay[0]} ($${bestDay[1].toFixed(2)})` : '-', hint: 'Maior lucro diário.' },
+    { label: 'Pior Dia', value: worstDay ? `${worstDay[0]} ($${worstDay[1].toFixed(2)})` : '-', hint: 'Maior prejuízo diário.' },
   ]
 
   return (
@@ -227,11 +225,7 @@ export default function AccountDetailsPage() {
           <h1 className="text-2xl font-bold leading-tight">Conta #{accountNumber}</h1>
           {lastUpdated && (
             <p className="text-sm text-muted-foreground">
-              Última atualização:{' '}
-              {new Intl.DateTimeFormat('pt-BR', {
-                dateStyle: 'short',
-                timeStyle: 'short',
-              }).format(new Date(lastUpdated))}
+              Última atualização: {new Date(lastUpdated).toLocaleString('pt-BR')}
             </p>
           )}
         </div>
