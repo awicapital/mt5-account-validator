@@ -22,7 +22,10 @@ export default function DashboardMPage() {
   const [dailyPnls, setDailyPnls] = useState<DailyPnL[]>([]);
   const [totalTrades, setTotalTrades] = useState<number>(0);
   const [hasAccountData, setHasAccountData] = useState<boolean>(false);
+  const [activeCount, setActiveCount] = useState<number>(0);
+  const [pendingCount, setPendingCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
+
   const router = useRouter();
 
   useEffect(() => {
@@ -48,26 +51,43 @@ export default function DashboardMPage() {
 
       setUser(profile);
 
+      // 🔍 Buscar contas do usuário por email e contar ativas/pendentes
+      const { data: accounts, error: accountsError } = await supabase
+        .from("accounts")
+        .select("is_active")
+        .eq("email", profile.email);
+
+      if (!accountsError && accounts) {
+        const active = accounts.filter((a) => a.is_active === true).length;
+        const pending = accounts.filter((a) => a.is_active === false).length;
+
+        setActiveCount(active);
+        setPendingCount(pending);
+        setHasAccountData(accounts.length > 0);
+      } else {
+        console.error("Erro ao buscar contas:", accountsError?.message || accountsError);
+        setHasAccountData(false);
+      }
+
+      // 📊 Buscar dados de PnL e trades
       const accountsData = await fetchAccountsData();
 
       if (accountsData && accountsData.dailyPnls && accountsData.trades) {
         const parsed: DailyPnL[] = Object.entries(accountsData.dailyPnls).map(
           ([date, pnl]) => ({
             date: date.replaceAll(".", "-"),
-            pnl: typeof pnl === "number"
-              ? pnl
-              : Object.values(pnl as Record<string, number>).reduce(
-                  (sum, val) => sum + val,
-                  0
-                ),
+            pnl:
+              typeof pnl === "number"
+                ? pnl
+                : Object.values(pnl as Record<string, number>).reduce(
+                    (sum, val) => sum + val,
+                    0
+                  ),
           })
         );
 
         setDailyPnls(parsed);
         setTotalTrades(accountsData.trades.length);
-        setHasAccountData(true);
-      } else {
-        setHasAccountData(false);
       }
 
       setLoading(false);
@@ -99,6 +119,8 @@ export default function DashboardMPage() {
         email={user.email}
         role={user.access_level}
         avatarUrl={user.avatar_url || undefined}
+        activeCount={activeCount}
+        pendingCount={pendingCount}
       />
 
       <div className={hasAccountData ? "" : "opacity-30 pointer-events-none"}>
