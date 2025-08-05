@@ -52,14 +52,31 @@ export function CalendarPNL({ email, accounts }: CalendarPNLProps) {
         accounts.map(async (acc) => {
           const path = `${acc.account_number}.json`;
           const { data: urlData } = supabase.storage.from("logs").getPublicUrl(path);
-          if (!urlData?.publicUrl) return;
+
+          if (!urlData?.publicUrl) {
+            console.warn(`[❌] URL pública não encontrada para: ${path}`);
+            return;
+          }
+
+          console.log("[📱 FETCH URL]:", urlData.publicUrl);
 
           try {
-            const res = await fetch(urlData.publicUrl);
-            if (!res.ok) return;
+            const res = await fetch(urlData.publicUrl, { cache: "no-store" });
+
+            console.log("[📱 FETCH STATUS]:", res.status);
+
+            if (!res.ok) {
+              console.warn(`[❌] Erro ao buscar JSON: ${res.statusText}`);
+              return;
+            }
+
             const trades: Trade[] = await res.json();
+            console.log(`[✅ TRADES - ${acc.account_number}]:`, trades);
+
             allTrades.push(...trades.filter((t) => t.type !== "deposit"));
-          } catch {}
+          } catch (err) {
+            console.error("[🔥 ERRO FETCH JSON]:", err);
+          }
         })
       );
 
