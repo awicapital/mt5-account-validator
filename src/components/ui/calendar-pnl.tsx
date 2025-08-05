@@ -149,23 +149,23 @@ export function CalendarPNL({ email, accounts }: CalendarPNLProps) {
           return (
             <div
               key={i}
-              className={`aspect-square relative rounded-md border p-1 text-white ${bgClass}`}
+              className={`aspect-square relative rounded-md border text-white ${bgClass}`}
             >
               <div className="absolute top-1 right-1 text-[10px] text-white/70">
                 {format(day, "d")}
               </div>
-              {pnl !== 0 && (
-                <div className="absolute inset-0 flex items-center justify-center px-1">
-                  <div className={`text-[11px] leading-tight ${pnlClass}`}>
+              <div className="flex flex-col items-center justify-center h-full px-1 space-y-1">
+                {pnl !== 0 && (
+                  <div className={`text-[12px] font-semibold leading-snug ${pnlClass}`}>
                     {formatShortCurrency(pnl)}
                   </div>
-                </div>
-              )}
-              {tradesCount > 0 && (
-                <div className="absolute bottom-1 right-1 text-[10px] text-white/50">
-                  {tradesCount} trade{tradesCount > 1 && "s"}
-                </div>
-              )}
+                )}
+                {tradesCount > 0 && (
+                  <div className="text-[10px] text-white/60 leading-none">
+                    {tradesCount} trade{tradesCount > 1 && "s"}
+                  </div>
+                )}
+              </div>
             </div>
           );
         })}
