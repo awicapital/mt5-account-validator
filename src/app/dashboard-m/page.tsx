@@ -21,14 +21,18 @@ export default function MobileDashboardPage() {
   const [email, setEmail] = useState("");
 
   useEffect(() => {
-    const init = async () => {
-      const { data: user, error } = await supabase.auth.getUser();
-      if (error || !user.user?.email) {
+    const fetchUserAndData = async () => {
+      const {
+        data: { session },
+        error,
+      } = await supabase.auth.getSession();
+
+      if (error || !session?.user?.email) {
         router.push("/login");
         return;
       }
 
-      const userEmail = user.user.email;
+      const userEmail = session.user.email;
       setEmail(userEmail);
 
       const { data: accountsData } = await supabase
@@ -42,7 +46,8 @@ export default function MobileDashboardPage() {
 
       setLoading(false);
     };
-    init();
+
+    fetchUserAndData();
   }, [router]);
 
   if (loading) {
