@@ -1,8 +1,12 @@
+import dayjs from "dayjs";
+import customParseFormat from "dayjs/plugin/customParseFormat";
 import { supabase } from "./supabase";
 
+dayjs.extend(customParseFormat);
+
 export interface Trade {
-  id: string;         // <— novo campo
-  date: string;
+  id: string;
+  date: string;    // sempre em ISO, ex: "2025-08-01T14:23:00.000Z"
   type: string;
   profit: number;
   accountId: string;
@@ -18,17 +22,19 @@ export interface AccountsData {
 
 export async function fetchAccountsData(): Promise<AccountsData | null> {
   try {
+    // 1) pega o usuário logado
     const { data: session } = await supabase.auth.getUser();
     const email = session?.user?.email;
     if (!email) return null;
 
+    // 2) busca as contas do usuário
     const { data: accounts, error: accountsError } = await supabase
       .from("accounts")
       .select("account_number")
       .eq("email", email);
     if (accountsError || !accounts) return null;
 
-    const accountNumbers = accounts.map((acc) => acc.account_number);
+    const accountNumbers = accounts.map((a) => a.account_number);
     if (accountNumbers.length === 0) {
       return { trades: [], dailyPnls: {}, totalDeposits: 0 };
     }
@@ -36,6 +42,7 @@ export async function fetchAccountsData(): Promise<AccountsData | null> {
     const trades: Trade[] = [];
     let totalDeposits = 0;
 
+    // 3) para cada conta, baixa o JSON de logs e parseia os trades
     for (const accNumber of accountNumbers) {
       const path = `${accNumber}.json`;
       const { data: urlData } = supabase.storage.from("logs").getPublicUrl(path);
@@ -48,7 +55,7 @@ export async function fetchAccountsData(): Promise<AccountsData | null> {
         const raw = await res.json();
         if (!Array.isArray(raw)) continue;
 
-        // Aqui geramos um id único para cada trade, combinando conta + timestamp + índice
+        // 4) converte cada registro bruto em Trade tipado e com date em ISO
         const parsed: Trade[] = raw
           .filter((t) => t.date && typeof t.profit === "number")
           .map((t, idx) => {
@@ -57,9 +64,27 @@ export async function fetchAccountsData(): Promise<AccountsData | null> {
               totalDeposits += t.profit;
             }
 
+            // tenta parsear formatos conhecidos de forma estrita
+            let dateObj = dayjs(
+              t.date,
+              [
+                "YYYY-MM-DDTHH:mm:ss.SSSZ",  // ISO completo
+                "YYYY-MM-DDTHH:mm:ssZ",      // ISO sem milissegundos
+                "YYYY-MM-DD HH:mm:ss",       // espaço em vez de T
+                "YYYY.MM.DD HH:mm:ss",       // ponto no lugar de hífen
+              ],
+              true // strict
+            );
+            // se não parseou no strict, usa o parse solto do dayjs
+            if (!dateObj.isValid()) {
+              dateObj = dayjs(t.date);
+            }
+            // se ainda não for válido, fallback para string original
+            const isoDate = dateObj.isValid() ? dateObj.toISOString() : t.date;
+
             return {
-              id: `${accNumber}-${t.date}-${idx}`,  // <— geração do id
-              date: t.date,
+              id: `${accNumber}-${isoDate}-${idx}`,
+              date: isoDate,
               type: t.type,
               profit: t.profit,
               accountId: accNumber.toString(),
@@ -69,24 +94,23 @@ export async function fetchAccountsData(): Promise<AccountsData | null> {
           });
 
         trades.push(...parsed);
-      } catch (err) {
-        // ignora erro de fetch / parse naquele arquivo
-        continue;
+      } catch {
+        // ignora erro naquele arquivo e segue
       }
     }
 
-    // monta o dailyPnls (sem os depósitos)
+    // 5) monta o dailyPnls (soma por dia, excluindo depósitos)
     const dailyPnls: Record<string, number> = {};
     trades
       .filter((t) => t.type !== "deposit")
       .forEach((t) => {
-        // usa a parte da data antes do espaço (por ex. "2025-08-05")
-        const day = t.date.split(" ")[0];
+        // pega a parte YYYY-MM-DD do ISO
+        const day = t.date.split("T")[0];
         dailyPnls[day] = (dailyPnls[day] || 0) + t.profit;
       });
 
     return { trades, dailyPnls, totalDeposits };
-  } catch (err) {
+  } catch {
     return null;
   }
 }
