@@ -5,11 +5,14 @@ export interface Trade {
   type: string;
   profit: number;
   accountId: string;
+  symbol?: string;
+  volume?: number;
 }
 
 export interface AccountsData {
   trades: Trade[];
   dailyPnls: Record<string, number>;
+  totalDeposits: number;
 }
 
 export async function fetchAccountsData(): Promise<AccountsData | null> {
@@ -27,9 +30,10 @@ export async function fetchAccountsData(): Promise<AccountsData | null> {
     if (accountsError || !accounts) return null;
 
     const accountNumbers = accounts.map((acc) => acc.account_number);
-    if (accountNumbers.length === 0) return { trades: [], dailyPnls: {} };
+    if (accountNumbers.length === 0) return { trades: [], dailyPnls: {}, totalDeposits: 0 };
 
     const trades: Trade[] = [];
+    let totalDeposits = 0;
 
     for (const accNumber of accountNumbers) {
       const path = `${accNumber}.json`;
@@ -44,14 +48,22 @@ export async function fetchAccountsData(): Promise<AccountsData | null> {
         const raw = await res.json();
         if (!Array.isArray(raw)) continue;
 
-        const parsed = raw
-          .filter((t) => t.type !== "deposit" && t.date && typeof t.profit === "number")
-          .map((t) => ({
-            date: t.date,
-            type: t.type,
-            profit: t.profit,
-            accountId: accNumber.toString(),
-          }));
+        const parsed: Trade[] = raw
+          .filter((t) => t.date && typeof t.profit === "number")
+          .map((t) => {
+            if (t.type === "deposit") {
+              totalDeposits += t.profit;
+            }
+
+            return {
+              date: t.date,
+              type: t.type,
+              profit: t.profit,
+              accountId: accNumber.toString(),
+              symbol: t.symbol,
+              volume: t.volume,
+            };
+          });
 
         trades.push(...parsed);
       } catch (err) {
@@ -60,12 +72,14 @@ export async function fetchAccountsData(): Promise<AccountsData | null> {
     }
 
     const dailyPnls: Record<string, number> = {};
-    trades.forEach((t) => {
-      const d = t.date.split(" ")[0];
-      dailyPnls[d] = (dailyPnls[d] || 0) + t.profit;
-    });
+    trades
+      .filter((t) => t.type !== "deposit")
+      .forEach((t) => {
+        const d = t.date.split(" ")[0];
+        dailyPnls[d] = (dailyPnls[d] || 0) + t.profit;
+      });
 
-    return { trades, dailyPnls };
+    return { trades, dailyPnls, totalDeposits };
   } catch (err) {
     return null;
   }

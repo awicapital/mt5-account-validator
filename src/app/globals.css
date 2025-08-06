@@ -1,12 +1,39 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* === FONTES LOCAIS: SATOSHI === */
+@font-face {
+  font-family: "Satoshi";
+  src: url("/fonts/satoshi/Satoshi-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Satoshi";
+  src: url("/fonts/satoshi/Satoshi-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Satoshi";
+  src: url("/fonts/satoshi/Satoshi-Bold.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
 @theme inline {
-  /* Mapeamento de cores usadas pelo Tailwind com variáveis CSS */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+
+  /* Atualizado para usar Satoshi */
+  --font-sans: "Satoshi", sans-serif;
   --font-mono: var(--font-geist-mono);
+
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -43,67 +70,38 @@
 }
 
 :root {
-  /* Raio padrão dos cantos */
   --radius: 0.625rem;
 
-  /* Cor do fundo da página — altere aqui para mudar fundo geral */
   --background: #03182f;
-
-  /* Cor principal do texto (parágrafos, títulos, labels) — altere aqui para mudar cor do texto */
   --foreground: #232a4b;
 
-  /* Cor do fundo de cards e containers — altere para mudar fundo de caixas e formulários */
   --card: #03182f;
+  --card-foreground: #ffffff;
 
-  /* Cor do texto dentro dos cards — altere para mudar texto interno de containers */
-  --card-foreground: #FFFFFF;
-
-  /* Cor do fundo de popovers e tooltips — geralmente igual ao card */
   --popover: #ffffff;
-
-  /* Cor do texto dentro dos popovers */
   --popover-foreground: #232a4b;
 
-  /* Cor principal do tema (botões, links) — altere para mudar cor dos botões e links */
   --primary: #268BFF;
+  --primary-foreground: #ffffff;
 
-  /* Cor do texto dentro dos botões (que usam cor primary) */
-  --primary-foreground: #FFFFFF;
-
-  /* Cor secundária de fundo (ex: para áreas menos importantes) */
   --secondary: #f4f5f7;
-
-  /* Cor do texto secundário (ex: textos menos destacados) */
   --secondary-foreground: #268BFF;
 
-  /* Cor para áreas e textos "muted" (ex: placeholders) */
   --muted: #f4f5f7;
+  --muted-foreground: #a0aec0;
 
-  /* Cor do texto dos placeholders - agora mais visível */
-  --muted-foreground: #a0aec0; /* Azul cinza claro, legível */
-
-  /* Cor de destaque/accent — pode ser usada para backgrounds leves */
   --accent: #f4f5f7;
-
-  /* Cor do texto em elementos de destaque */
   --accent-foreground: #268BFF;
 
-  /* Cor para avisos ou ações destrutivas (ex: botões de deletar) */
   --destructive: #db952d;
 
-  /* Cor das bordas de inputs, botões, caixas */
   --border: #ececf2;
-
-  /* Cor do fundo dos inputs */
   --input: #ececf2;
 
-  /* Cor para anéis de foco e outline */
   --ring: #a1b8ff;
 
-  /* Sombra suave para cards para dar profundidade */
   --card-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 
-  /* Cores para gráficos, sidebar e outros elementos auxiliares */
   --chart-1: #ada931;
   --chart-2: #7880bf;
   --chart-3: #5f73e5;
@@ -121,12 +119,20 @@
 }
 
 @layer base {
-  /* Estilos básicos para bordas e outline */
   * {
     @apply border-border outline-ring/50;
   }
-  /* Aplica fundo e texto padrão no body */
+
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* Oculta scrollbar horizontal */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }

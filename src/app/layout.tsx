@@ -1,18 +1,9 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
-import { AuthProvider } from "@/components/providers/auth-provider"; // ✅ Importação do Provider
+import { AuthProvider } from "@/components/providers/auth-provider";
+import MobileHeader from "@/components/ui/mobile-header";
+import MobileNav from "@/components/ui/mobile-nav";
 import "./globals.css";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   title: "MT5 Account Validator",
@@ -26,16 +17,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR" className="dark">
-      <body
-        className={`
-          ${geistSans.variable} ${geistMono.variable} 
-          bg-slate-100 text-gray-900 
-          dark:bg-gray-900 dark:text-gray-100 
-          antialiased min-h-screen
-        `}
-      >
+      <body className="font-sans bg-background text-foreground antialiased min-h-screen">
         <AuthProvider>
-          {children}
+          <MobileHeader />
+          <main className="pt-[72px] px-4 md:px-8 py-6">
+            {children}
+          </main>
+          <MobileNav />
           <Toaster richColors position="top-center" />
         </AuthProvider>
       </body>

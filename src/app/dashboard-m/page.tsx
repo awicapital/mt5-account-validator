@@ -3,11 +3,12 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
+import dayjs from "dayjs";
 
 import { supabase } from "@/lib/supabase";
 import { fetchAccountsData, Trade } from "@/lib/accountsData";
-import { DashboardUserCard } from "@/components/ui/dashboard-user-card";
 import { DashboardCalendar, DailyPnL } from "@/components/ui/dashboard-calendar";
+import { DashboardPnLCard } from "@/components/ui/dashboard-pnl-card";
 
 interface UserProfile {
   id: string;
@@ -20,11 +21,13 @@ interface UserProfile {
 export default function DashboardMPage() {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [dailyPnls, setDailyPnls] = useState<DailyPnL[]>([]);
-  const [totalTrades, setTotalTrades] = useState<number>(0);
+  const [allTrades, setAllTrades] = useState<Trade[]>([]);
+  const [balance, setBalance] = useState<number>(0);
+  const [monthlyGrowthPercent, setMonthlyGrowthPercent] = useState<number>(0);
+  const [monthlyGrowthPositive, setMonthlyGrowthPositive] = useState<boolean>(true);
   const [hasAccountData, setHasAccountData] = useState<boolean>(false);
-  const [activeCount, setActiveCount] = useState<number>(0);
-  const [pendingCount, setPendingCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
   const router = useRouter();
 
@@ -51,43 +54,53 @@ export default function DashboardMPage() {
 
       setUser(profile);
 
-      // 🔍 Buscar contas do usuário por email e contar ativas/pendentes
       const { data: accounts, error: accountsError } = await supabase
         .from("accounts")
         .select("is_active")
         .eq("email", profile.email);
 
-      if (!accountsError && accounts) {
-        const active = accounts.filter((a) => a.is_active === true).length;
-        const pending = accounts.filter((a) => a.is_active === false).length;
+      setHasAccountData(!accountsError && accounts && accounts.length > 0);
 
-        setActiveCount(active);
-        setPendingCount(pending);
-        setHasAccountData(accounts.length > 0);
-      } else {
-        console.error("Erro ao buscar contas:", accountsError?.message || accountsError);
-        setHasAccountData(false);
-      }
-
-      // 📊 Buscar dados de PnL e trades
       const accountsData = await fetchAccountsData();
 
-      if (accountsData && accountsData.dailyPnls && accountsData.trades) {
+      if (accountsData) {
         const parsed: DailyPnL[] = Object.entries(accountsData.dailyPnls).map(
           ([date, pnl]) => ({
             date: date.replaceAll(".", "-"),
-            pnl:
-              typeof pnl === "number"
-                ? pnl
-                : Object.values(pnl as Record<string, number>).reduce(
-                    (sum, val) => sum + val,
-                    0
-                  ),
+            pnl: typeof pnl === "number" ? pnl : 0,
           })
         );
 
         setDailyPnls(parsed);
-        setTotalTrades(accountsData.trades.length);
+        setAllTrades(accountsData.trades);
+
+        const trades = accountsData.trades;
+
+        const totalPnL = trades
+          .filter((t) => t.type !== "deposit")
+          .reduce((sum, t) => sum + t.profit, 0);
+
+        const fullBalance = accountsData.totalDeposits + totalPnL;
+        setBalance(fullBalance);
+
+        const now = new Date();
+        const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+        const pnlThisMonth = trades
+          .filter((t) => t.type !== "deposit" && new Date(t.date) >= thisMonth)
+          .reduce((sum, t) => sum + t.profit, 0);
+
+        const capitalBeforeMonth = trades
+          .filter((t) => new Date(t.date) < thisMonth)
+          .reduce((sum, t) => sum + t.profit, 0);
+
+        const growth =
+          capitalBeforeMonth > 0
+            ? Number(((pnlThisMonth / capitalBeforeMonth) * 100).toFixed(2))
+            : 0;
+
+        setMonthlyGrowthPercent(growth);
+        setMonthlyGrowthPositive(pnlThisMonth >= 0);
       }
 
       setLoading(false);
@@ -112,20 +125,73 @@ export default function DashboardMPage() {
     );
   }
 
+  const tradesByAccount = allTrades
+    .filter((t) => selectedDay && t.date.split("T")[0] === selectedDay)
+    .reduce<Record<string, Trade[]>>((acc, trade) => {
+      if (!acc[trade.accountId]) acc[trade.accountId] = [];
+      acc[trade.accountId].push(trade);
+      return acc;
+    }, {});
+
   return (
-    <div className="p-4 bg-[#03182f] min-h-dvh pb-28 space-y-6 text-white">
-      <DashboardUserCard
-        name={user.full_name}
-        email={user.email}
-        role={user.access_level}
-        avatarUrl={user.avatar_url || undefined}
-        activeCount={activeCount}
-        pendingCount={pendingCount}
+    <div className="pb-6 bg-[#03182f] min-h-dvh space-y-6 text-white lg:px-8">
+      <DashboardPnLCard
+        balance={balance}
+        growthPercent={monthlyGrowthPercent}
+        growthPositive={monthlyGrowthPositive}
       />
 
       <div className={hasAccountData ? "" : "opacity-30 pointer-events-none"}>
-        <DashboardCalendar dailyPnls={dailyPnls} />
+        <DashboardCalendar
+          dailyPnls={dailyPnls}
+          trades={allTrades}
+          onDaySelect={(day) => setSelectedDay(day)}
+        />
       </div>
+
+      {selectedDay && (
+        <div className="mt-6 space-y-6">
+          {Object.entries(tradesByAccount).map(([accountId, trades]) => (
+            <div
+              key={`account-${accountId}`}
+              className="bg-[#0f172a] border border-white/10 rounded-lg p-4"
+            >
+              <h3 className="text-sm text-white/70 mb-2">
+                Conta {accountId}
+              </h3>
+              <ul className="text-sm space-y-2">
+                {trades.map((trade) => (
+                  <li
+                    key={trade.id}
+                    className="grid grid-cols-5 gap-2 border-b border-white/5 pb-1 text-white/90"
+                  >
+                    <span className="col-span-1 text-white/70">
+                      {dayjs(trade.date).format("HH:mm")}
+                    </span>
+                    <span className="col-span-1">{trade.symbol || "---"}</span>
+                    <span className="col-span-1">{trade.volume?.toFixed(2)} lot</span>
+                    <span className="col-span-1 capitalize">{trade.type}</span>
+                    <span
+                      className={
+                        trade.profit > 0
+                          ? "text-green-500 text-right"
+                          : trade.profit < 0
+                          ? "text-red-500 text-right"
+                          : "text-white text-right"
+                      }
+                    >
+                      {trade.profit.toLocaleString("pt-BR", {
+                        style: "currency",
+                        currency: "USD",
+                      })}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      )}
 
       {!hasAccountData && (
         <p className="text-center text-sm text-white/70">

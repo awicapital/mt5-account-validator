@@ -1,3 +1,4 @@
+/** @type {import('tailwindcss').Config} */
 module.exports = {
   content: [
     "./app/**/*.{ts,tsx}",
@@ -16,7 +17,9 @@ module.exports = {
         background: "var(--background)",
         foreground: "var(--foreground)",
         ring: "var(--ring)",
-        // adicione outras cores se precisar
+      },
+      fontFamily: {
+        sans: ["Satoshi", "sans-serif"],
       },
     },
   },
