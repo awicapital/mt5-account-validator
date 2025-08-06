@@ -3,7 +3,7 @@
 import dayjs, { Dayjs } from "dayjs";
 import "dayjs/locale/pt-br";
 import { useMemo, useState, useRef, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, PanInfo } from "framer-motion";
 import { Trade } from "@/lib/accountsData";
 
 dayjs.locale("pt-br");
@@ -17,8 +17,8 @@ export interface DailyPnL {
 
 interface DashboardCalendarProps {
   dailyPnls: DailyPnL[];
-  trades?: Trade[];
-  onDaySelect?: (date: string | null) => void;
+  trades: Trade[];
+  onDaySelect: (date: string | null) => void;
 }
 
 function formatPnl(pnl: number): string {
@@ -134,7 +134,7 @@ export function DashboardCalendar({ dailyPnls, trades, onDaySelect }: DashboardC
   }
 
   const tradesForSelectedDay = useMemo(() => {
-    if (!trades || !selectedDay) return [];
+    if (!selectedDay) return [];
     return trades.filter(
       (t) => new Date(t.date).toISOString().split("T")[0] === selectedDay
     );
@@ -149,14 +149,17 @@ export function DashboardCalendar({ dailyPnls, trades, onDaySelect }: DashboardC
   const totalColor =
     monthTotal > 0 ? "text-[#10b981]" : monthTotal < 0 ? "text-[#ef4444]" : "text-white";
 
-  const handleSwipe = (event: any, info: { offset: { x: number } }) => {
+  function handleSwipe(
+    _event: MouseEvent | TouchEvent | PointerEvent,
+    info: PanInfo
+  ) {
     const threshold = 50;
     if (info.offset.x > threshold && currentMonthIndex > 0) {
       setCurrentMonthIndex((prev) => prev - 1);
     } else if (info.offset.x < -threshold && currentMonthIndex < months.length - 1) {
       setCurrentMonthIndex((prev) => prev + 1);
     }
-  };
+  }
 
   return (
     <div className="w-full">
@@ -237,7 +240,7 @@ export function DashboardCalendar({ dailyPnls, trades, onDaySelect }: DashboardC
                 const newDay = selectedDay === key ? null : key;
                 setSelectedDay(newDay);
                 setSelectedPnl(newDay ? pnl ?? null : null);
-                onDaySelect?.(newDay);
+                onDaySelect(newDay);
               };
 
               return (
