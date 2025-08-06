@@ -1,28 +1,39 @@
+// app/layout.tsx
 import type { Metadata } from "next";
+import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/components/providers/auth-provider";
 import MobileHeader from "@/components/ui/mobile-header";
 import MobileNav from "@/components/ui/mobile-nav";
-import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "MT5 Account Validator",
+  title: "AWI Club",
   description: "Validação de contas MT5 com segurança e performance.",
+  viewport: "width=device-width, initial-scale=1, viewport-fit=cover",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+  },
+  icons: {
+    icon: [
+      { url: "/icons/icon-192x192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512x512.png", sizes: "512x512", type: "image/png" },
+    ],
+  },
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
     <html lang="pt-BR" className="dark">
       <body className="font-sans bg-background text-foreground antialiased min-h-screen">
         <AuthProvider>
           <MobileHeader />
-          <main className="pt-[72px] px-4 md:px-8 py-6">
-            {children}
-          </main>
+          <main className="pt-[72px] px-4 md:px-8 py-6">{children}</main>
           <MobileNav />
           <Toaster richColors position="top-center" />
         </AuthProvider>
