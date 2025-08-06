@@ -63,8 +63,8 @@ function MonthYearSelect({
   }, [onClose]);
 
   const yearsMap = months.reduce<Record<string, string[]>>((acc, m) => {
-    const [year, month] = m.split("-");
-    if (!acc[year]) acc[year] = [];
+    const [year] = m.split("-");
+    acc[year] = acc[year] || [];
     acc[year].push(m);
     return acc;
   }, {});
@@ -105,7 +105,11 @@ function MonthYearSelect({
   );
 }
 
-export function DashboardCalendar({ dailyPnls, trades, onDaySelect }: DashboardCalendarProps) {
+export function DashboardCalendar({
+  dailyPnls,
+  trades,
+  onDaySelect,
+}: DashboardCalendarProps) {
   const today = dayjs();
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [selectedPnl, setSelectedPnl] = useState<number | null>(null);
@@ -121,7 +125,10 @@ export function DashboardCalendar({ dailyPnls, trades, onDaySelect }: DashboardC
 
   const [currentMonthIndex, setCurrentMonthIndex] = useState(months.length - 1);
   const currentMonth = dayjs(months[currentMonthIndex]);
-  const pnlMap = new Map(dailyPnls.map((entry) => [entry.date, entry.pnl]));
+  const pnlMap = useMemo(
+    () => new Map(dailyPnls.map((entry) => [entry.date, entry.pnl])),
+    [dailyPnls]
+  );
 
   const startOfMonth = currentMonth.startOf("month").startOf("week");
   const endOfMonth = currentMonth.endOf("month").endOf("week");
@@ -133,10 +140,11 @@ export function DashboardCalendar({ dailyPnls, trades, onDaySelect }: DashboardC
     date = date.add(1, "day");
   }
 
+  // ——————— FIX: não usar `new Date(...)` aqui ———————
   const tradesForSelectedDay = useMemo(() => {
     if (!selectedDay) return [];
     return trades.filter(
-      (t) => new Date(t.date).toISOString().split("T")[0] === selectedDay
+      (t) => dayjs(t.date).format("YYYY-MM-DD") === selectedDay
     );
   }, [trades, selectedDay]);
 
@@ -189,8 +197,8 @@ export function DashboardCalendar({ dailyPnls, trades, onDaySelect }: DashboardC
         )}
 
         <div className="grid grid-cols-7 gap-2 text-center text-xs text-[#94a3b8] mb-2">
-          {daysOfWeek.map((day, index) => (
-            <div key={`dow-${index}`}>{day}</div>
+          {daysOfWeek.map((dow, idx) => (
+            <div key={idx}>{dow}</div>
           ))}
         </div>
 
@@ -302,10 +310,10 @@ export function DashboardCalendar({ dailyPnls, trades, onDaySelect }: DashboardC
                           {trade.symbol}
                           <span
                             className={`uppercase text-[10px] font-semibold px-1.5 py-0.5 rounded ${
-                              trade.type === "buy"
-                                ? "bg-green-600/20 text-[#10b981]"
-                                : "bg-red-600/20 text-[#ef4444]"
-                            }`}
+                            trade.type === "buy"
+                              ? "bg-green-600/20 text-[#10b981]"
+                              : "bg-red-600/20 text-[#ef4444]"
+                          }`}
                           >
                             {trade.type.toUpperCase()}
                           </span>
