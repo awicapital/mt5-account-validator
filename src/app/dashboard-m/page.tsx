@@ -1,3 +1,4 @@
+// src/app/(private)/dashboard-m/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -7,7 +8,8 @@ import dayjs from "dayjs";
 import "dayjs/locale/pt-br";
 
 import { supabase } from "@/lib/supabase";
-import { fetchAccountsData, Trade, DailyPnL } from "@/lib/accountsData";
+import { fetchAccountsData, Trade } from "@/lib/accountsData";
+import type { DailyPnL } from "@/components/ui/dashboard-calendar";
 import { DashboardCalendar } from "@/components/ui/dashboard-calendar";
 import { DashboardPnLCard } from "@/components/ui/dashboard-pnl-card";
 
@@ -198,8 +200,8 @@ export default function DashboardMPage() {
                           <span
                             className={`px-1.5 py-0.5 text-[10px] font-semibold rounded-full border ${
                               trade.type === "buy"
-                                ? "bg-green-600/20 border-green-600 text-green-500"
-                                : "bg-red-600/20 border-red-600 text-red-500"
+                                ? "bg-[#10b981]/20 border-[#10b981] text-[#10b981]"
+                                : "bg-[#ef4444]/20 border-[#ef4444] text-[#ef4444]"
                             }`}
                           >
                             {trade.type.toUpperCase()}
@@ -208,9 +210,9 @@ export default function DashboardMPage() {
                         <span
                           className={`text-right ${
                             trade.profit > 0
-                              ? "text-green-500"
+                              ? "text-[#10b981]"
                               : trade.profit < 0
-                              ? "text-red-500"
+                              ? "text-[#ef4444]"
                               : "text-white"
                           }`}
                         >
