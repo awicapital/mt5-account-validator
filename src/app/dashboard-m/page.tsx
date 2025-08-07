@@ -107,7 +107,7 @@ export default function DashboardMPage() {
 
   if (loading) {
     return (
-      <div className="h-dvh flex items-center justify-center bg-[#03182f]">
+      <div className="h-[100dvh] flex items-center justify-center bg-[#03182f]">
         <Loader2 className="animate-spin w-6 h-6 text-white" />
       </div>
     );
@@ -115,7 +115,7 @@ export default function DashboardMPage() {
 
   if (!user) {
     return (
-      <div className="h-dvh flex items-center justify-center bg-[#03182f] text-white">
+      <div className="h-[100dvh] flex items-center justify-center bg-[#03182f] text-white">
         Usuário não encontrado.
       </div>
     );
@@ -133,14 +133,24 @@ export default function DashboardMPage() {
   }
 
   return (
-    // Adiciona padding bottom para nav bar e safe area
-    <div className="pb-24 bg-[#03182f] min-h-dvh space-y-6 lg:px-8 text-white">
+    <div
+      className={`
+        pt-4 pb-[calc(80px+env(safe-area-inset-bottom))]
+        bg-[#03182f]
+        min-h-[100dvh]
+        space-y-6
+          lg:px-8
+        text-white
+      `}
+    >
       {/* Card principal de PnL */}
-      <DashboardPnLCard
-        balance={balance}
-        growthPercent={monthlyGrowthPercent}
-        growthPositive={monthlyGrowthPositive}
-      />
+      <div className="relative z-30">
+        <DashboardPnLCard
+          balance={balance}
+          growthPercent={monthlyGrowthPercent}
+          growthPositive={monthlyGrowthPositive}
+        />
+      </div>
 
       {/* Calendário */}
       <div className={`${hasAccountData ? "opacity-100" : "opacity-30"} transition-opacity`}>
@@ -155,7 +165,6 @@ export default function DashboardMPage() {
       {selectedDay && (
         <div className="relative z-20 mt-6 space-y-6">
           {Object.entries(tradesByAccount).map(([accountId, trades]) => {
-            // dia da semana com inicial maiúscula
             const weekday = dayjs(selectedDay).format("dddd");
             const weekdayCap = weekday[0].toUpperCase() + weekday.slice(1);
 
