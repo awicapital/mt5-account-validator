@@ -1,6 +1,7 @@
+// src/components/ui/mobile-header.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Bell, HelpCircle } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
@@ -28,28 +29,57 @@ function getGreeting() {
 
 export default function MobileHeader() {
   const [user, setUser] = useState<UserProfile | null>(null);
+  const [visible, setVisible] = useState(true);
+  const lastScrollY = useRef(0);
 
+  // Busca dados do usuário
   useEffect(() => {
     const fetchUser = async () => {
       const { data: session } = await supabase.auth.getUser();
       const email = session?.user?.email;
       if (!email) return;
-
       const { data: profile } = await supabase
         .from("users")
         .select("full_name, email, access_level, avatar_url")
         .eq("email", email)
         .single();
-
       setUser(profile);
     };
-
     fetchUser();
   }, []);
 
+  // Controla visibilidade ao rolar
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentY = window.scrollY;
+      if (currentY <= 0) {
+        // No topo: garante visível
+        setVisible(true);
+      } else if (currentY > lastScrollY.current) {
+        // Rolando pra baixo
+        setVisible(false);
+      } else {
+        // Rolando pra cima
+        setVisible(true);
+      }
+      lastScrollY.current = currentY;
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 h-[72px] bg-[#03182f] text-white flex items-center">
-      <div className="w-full max-w-screen-xl mx-auto px-4 md:px-8 flex items-center justify-between">
+    <header
+      className={`
+        fixed inset-x-0 top-0 z-50
+        transform transition-transform duration-300 ease-in-out
+        ${visible ? "translate-y-0" : "-translate-y-full"}
+        bg-[#03182f] text-white
+      `}
+      style={{ height: 72 }}
+    >
+      <div className="w-full max-w-screen-xl mx-auto px-4 md:px-8 flex items-center justify-between h-full">
+        {/* Avatar + Saudação */}
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 rounded-full overflow-hidden bg-[#1e2b45] flex items-center justify-center text-white text-base font-bold">
             {user?.avatar_url ? (
@@ -62,7 +92,6 @@ export default function MobileHeader() {
               getInitials(user?.full_name)
             )}
           </div>
-
           <div className="flex flex-col gap-y-1.5">
             <span className="text-xs text-white/60">{getGreeting()}</span>
             <div className="flex items-center gap-2">
@@ -78,6 +107,7 @@ export default function MobileHeader() {
           </div>
         </div>
 
+        {/* Ícones */}
         <div className="flex items-center gap-4">
           <div className="relative">
             <Bell className="w-5 h-5 cursor-pointer text-white" />

@@ -1,10 +1,7 @@
-// app/layout.tsx
 import type { Metadata } from "next";
 import "./globals.css";
-import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/components/providers/auth-provider";
-import MobileHeader from "@/components/ui/mobile-header";
-import MobileNav from "@/components/ui/mobile-nav";
+import LayoutWrapper from "@/components/ui/layout-wrapper";
 
 export const metadata: Metadata = {
   title: "AWI Club",
@@ -32,10 +29,7 @@ export default function RootLayout({
     <html lang="pt-BR" className="dark">
       <body className="font-sans bg-background text-foreground antialiased min-h-screen">
         <AuthProvider>
-          <MobileHeader />
-          <main className="pt-[72px] px-4 md:px-8 py-6">{children}</main>
-          <MobileNav />
-          <Toaster richColors position="top-center" />
+          <LayoutWrapper>{children}</LayoutWrapper>
         </AuthProvider>
       </body>
     </html>

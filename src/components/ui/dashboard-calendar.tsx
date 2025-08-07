@@ -1,9 +1,10 @@
+// src/components/ui/dashboard-calendar.tsx
 "use client";
 
 import dayjs, { Dayjs } from "dayjs";
 import "dayjs/locale/pt-br";
 import { useMemo, useState, useRef, useEffect } from "react";
-import { motion, AnimatePresence, PanInfo } from "framer-motion";
+import { motion, AnimatePresence, PanInfo, Variants } from "framer-motion";
 import { Trade } from "@/lib/accountsData";
 
 dayjs.locale("pt-br");
@@ -40,16 +41,15 @@ function getMonthsRange(start: Dayjs, end: Dayjs): string[] {
 function MonthYearSelect({
   months,
   currentMonthIndex,
-  setCurrentMonthIndex,
+  changeMonth,
   onClose,
 }: {
   months: string[];
   currentMonthIndex: number;
-  setCurrentMonthIndex: (i: number) => void;
+  changeMonth: (newIndex: number) => void;
   onClose: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (ref.current && !ref.current.contains(event.target as Node)) {
@@ -57,35 +57,34 @@ function MonthYearSelect({
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [onClose]);
 
   const yearsMap = months.reduce<Record<string, string[]>>((acc, m) => {
     const [year] = m.split("-");
-    acc[year] = acc[year] || [];
-    acc[year].push(m);
+    (acc[year] = acc[year] || []).push(m);
     return acc;
   }, {});
 
   return (
     <div
       ref={ref}
-      className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 bg-[#0f172a] border border-[#1d4ed8]/40 shadow-[0_0_0_1px_#1d4ed8] rounded-xl px-6 py-5 w-full max-w-sm"
+      className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 
+                 bg-[#0f172a] border border-[#1d4ed8]/40 shadow-[0_0_0_1px_#1d4ed8] 
+                 rounded-xl px-6 py-5 w-full max-w-sm"
     >
       {Object.entries(yearsMap).map(([year, yearMonths]) => (
         <div key={year} className="mb-4">
           <div className="text-sm text-white/50 font-semibold mb-3">{year}</div>
           <div className="grid grid-cols-6 gap-2">
             {yearMonths.map((m) => {
-              const index = months.findIndex((x) => x === m);
-              const isSelected = m === months[currentMonthIndex];
+              const index = months.indexOf(m);
+              const isSelected = index === currentMonthIndex;
               return (
                 <button
                   key={m}
                   onClick={() => {
-                    setCurrentMonthIndex(index);
+                    changeMonth(index);
                     onClose();
                   }}
                   className={`text-xs rounded-md px-2 py-1 capitalize transition font-medium ${
@@ -111,28 +110,37 @@ export function DashboardCalendar({
   onDaySelect,
 }: DashboardCalendarProps) {
   const today = dayjs();
-  const [selectedDay, setSelectedDay] = useState<string | null>(null);
-  const [selectedPnl, setSelectedPnl] = useState<number | null>(null);
   const [showMonthPicker, setShowMonthPicker] = useState(false);
 
+  // mapa date → pnl
+  const pnlMap = useMemo(
+    () => new Map(dailyPnls.map((d) => [d.date, d.pnl])),
+    [dailyPnls]
+  );
+
+  // build months array
   const months = useMemo(() => {
     if (dailyPnls.length === 0) return [today.format("YYYY-MM")];
     const minDate = dayjs(
-      dailyPnls.reduce((min, d) => (d.date < min ? d.date : min), dailyPnls[0].date)
+      dailyPnls.reduce((m, d) => (d.date < m ? d.date : m), dailyPnls[0].date)
     );
     return getMonthsRange(minDate, today);
   }, [dailyPnls, today]);
 
-  const [currentMonthIndex, setCurrentMonthIndex] = useState(months.length - 1);
-  const currentMonth = dayjs(months[currentMonthIndex]);
-  const pnlMap = useMemo(
-    () => new Map(dailyPnls.map((entry) => [entry.date, entry.pnl])),
-    [dailyPnls]
-  );
+  // estado com índice e direção para animação
+  const [currentMonthIndex, setCurrentMonthIndex] = useState(() => months.length - 1);
+  const [direction, setDirection] = useState(0);
 
+  const changeMonth = (newIndex: number) => {
+    setDirection(newIndex > currentMonthIndex ? 1 : -1);
+    setCurrentMonthIndex(newIndex);
+  };
+
+  const currentMonth = dayjs(months[currentMonthIndex]);
+
+  // grid de days
   const startOfMonth = currentMonth.startOf("month").startOf("week");
   const endOfMonth = currentMonth.endOf("month").endOf("week");
-
   const days: Dayjs[] = [];
   let date = startOfMonth;
   while (date.isBefore(endOfMonth) || date.isSame(endOfMonth, "day")) {
@@ -140,22 +148,24 @@ export function DashboardCalendar({
     date = date.add(1, "day");
   }
 
-  // ——————— FIX: não usar `new Date(...)` aqui ———————
-  const tradesForSelectedDay = useMemo(() => {
-    if (!selectedDay) return [];
-    return trades.filter(
-      (t) => dayjs(t.date).format("YYYY-MM-DD") === selectedDay
-    );
-  }, [trades, selectedDay]);
-
-  const monthTotal = days.reduce((acc, d) => {
-    if (!d.isSame(currentMonth, "month")) return acc;
-    const val = pnlMap.get(d.format("YYYY-MM-DD")) ?? 0;
-    return acc + val;
+  // totais do mês
+  const monthTotal = days.reduce((sum, d) => {
+    if (!d.isSame(currentMonth, "month")) return sum;
+    return sum + (pnlMap.get(d.format("YYYY-MM-DD")) ?? 0);
   }, 0);
-
   const totalColor =
-    monthTotal > 0 ? "text-[#10b981]" : monthTotal < 0 ? "text-[#ef4444]" : "text-white";
+    monthTotal > 0
+      ? "text-[#10b981]"
+      : monthTotal < 0
+      ? "text-[#ef4444]"
+      : "text-white";
+
+  // variantes customizadas para enter/exit
+  const variants: Variants = {
+    enter: (dir: number) => ({ opacity: 0, x: dir > 0 ? 50 : -50 }),
+    center: { opacity: 1, x: 0 },
+    exit: (dir: number) => ({ opacity: 0, x: dir > 0 ? -50 : 50 }),
+  };
 
   function handleSwipe(
     _event: MouseEvent | TouchEvent | PointerEvent,
@@ -163,101 +173,111 @@ export function DashboardCalendar({
   ) {
     const threshold = 50;
     if (info.offset.x > threshold && currentMonthIndex > 0) {
-      setCurrentMonthIndex((prev) => prev - 1);
-    } else if (info.offset.x < -threshold && currentMonthIndex < months.length - 1) {
-      setCurrentMonthIndex((prev) => prev + 1);
+      changeMonth(currentMonthIndex - 1);
+    } else if (
+      info.offset.x < -threshold &&
+      currentMonthIndex < months.length - 1
+    ) {
+      changeMonth(currentMonthIndex + 1);
     }
   }
 
+  // seleção de dia
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const onClickDay = (key: string, hasPnl: boolean) => {
+    if (!hasPnl) return;
+    const newKey = selectedDay === key ? null : key;
+    setSelectedDay(newKey);
+    onDaySelect(newKey);
+  };
+
   return (
     <div className="w-full">
-      <div className="rounded-xl py-4 bg-[#03182f] text-white w-full max-w-6xl mx-auto px-0 relative">
+      <div className="rounded-xl py-4 bg-[#03182f] text-white max-w-6xl mx-auto px-0 relative">
+        {/* Header */}
         <div className="flex items-start justify-between mb-4">
-          <div className="text-sm font-semibold text-white">Calendário</div>
+          <div className="text-sm font-semibold">Calendário</div>
           <div className="flex flex-col items-end">
             <button
-              onClick={() => setShowMonthPicker((prev) => !prev)}
+              onClick={() => setShowMonthPicker((v) => !v)}
               className="text-sm font-medium text-white hover:underline"
             >
               {currentMonth.format("MM/YY")}
             </button>
-            <span className="text-xs mt-1 font-medium">
-              Resultado: <span className={totalColor}>{formatPnl(monthTotal)}</span>
+            <span className={`text-xs mt-1 font-medium ${totalColor}`}> 
+              Resultado: {formatPnl(monthTotal)}
             </span>
           </div>
         </div>
 
+        {/* Month Picker */}
         {showMonthPicker && (
           <MonthYearSelect
             months={months}
             currentMonthIndex={currentMonthIndex}
-            setCurrentMonthIndex={setCurrentMonthIndex}
+            changeMonth={changeMonth}
             onClose={() => setShowMonthPicker(false)}
           />
         )}
 
+        {/* Weekdays */}
         <div className="grid grid-cols-7 gap-2 text-center text-xs text-[#94a3b8] mb-2">
-          {daysOfWeek.map((dow, idx) => (
-            <div key={idx}>{dow}</div>
+          {daysOfWeek.map((dow, i) => (
+            <div key={i}>{dow}</div>
           ))}
         </div>
 
-        <AnimatePresence mode="wait">
+        {/* Calendar Grid */}
+        <AnimatePresence initial={false} custom={direction} mode="wait">
           <motion.div
-            key={currentMonth.format("YYYY-MM")}
-            initial={{ opacity: 0, scale: 0.98, x: 50 }}
-            animate={{ opacity: 1, scale: 1, x: 0 }}
-            exit={{ opacity: 0, scale: 0.98, x: -50 }}
-            transition={{ type: "spring", stiffness: 300, damping: 20 }}
+            key={currentMonthIndex}
+            variants={variants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            custom={direction}
+            transition={{ type: "tween", duration: 0.3 }}
             className="grid grid-cols-7 gap-2"
             drag="x"
             dragConstraints={{ left: 0, right: 0 }}
             onDragEnd={handleSwipe}
           >
             {days.map((day) => {
-              const isCurrentMonthDay = day.isSame(currentMonth, "month");
               const key = day.format("YYYY-MM-DD");
               const pnl = pnlMap.get(key);
               const hasPnl = pnl !== undefined;
-              const pnlPositive = hasPnl && pnl! > 0;
-              const pnlNegative = hasPnl && pnl! < 0;
+              const isPositive = hasPnl && pnl! > 0;
+              const isNegative = hasPnl && pnl! < 0;
+              const isCurrent = day.isSame(currentMonth, "month");
               const isSelected = selectedDay === key;
 
-              const borderColor = isSelected
+              const border = isSelected
                 ? "border-blue-600"
                 : hasPnl
-                ? pnlPositive
+                ? isPositive
                   ? "border-[#10b981]"
-                  : pnlNegative
+                  : isNegative
                   ? "border-[#ef4444]"
                   : "border-[#334155]"
                 : "border-transparent";
 
-              const bgColor = isSelected
+              const bg = isSelected
                 ? "bg-[#1e293b]"
                 : hasPnl
-                ? pnlPositive
+                ? isPositive
                   ? "bg-[#10b981]/20"
-                  : pnlNegative
+                  : isNegative
                   ? "bg-[#ef4444]/20"
                   : "bg-[#1e293b]"
                 : "bg-[#1e293b]";
 
-              const handleClick = () => {
-                if (!hasPnl) return;
-                const newDay = selectedDay === key ? null : key;
-                setSelectedDay(newDay);
-                setSelectedPnl(newDay ? pnl ?? null : null);
-                onDaySelect(newDay);
-              };
-
               return (
                 <div
                   key={key}
-                  onClick={handleClick}
-                  className={`cursor-pointer relative aspect-square w-full rounded-md text-xs font-medium flex flex-col items-center justify-center border ${borderColor} ${bgColor} ${
-                    !isCurrentMonthDay ? "opacity-30" : ""
-                  }`}
+                  onClick={() => onClickDay(key, hasPnl)}
+                  className={`cursor-pointer relative aspect-square w-full rounded-md 
+                              text-xs font-medium flex flex-col items-center justify-center 
+                              border ${border} ${bg} ${!isCurrent ? "opacity-30" : ""}`}
                 >
                   <span className="absolute top-1 right-1 text-[10px]">
                     {day.format("D")}
@@ -271,74 +291,6 @@ export function DashboardCalendar({
               );
             })}
           </motion.div>
-        </AnimatePresence>
-
-        <AnimatePresence>
-          {selectedDay && dayjs(selectedDay).isSame(currentMonth, "month") && (
-            <motion.div
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 12 }}
-              transition={{ duration: 0.2 }}
-              className="mt-6 w-full max-w-3xl mx-auto px-4"
-            >
-              <div className="rounded-2xl border border-blue-600/30 bg-[#1e293b] p-6 shadow-md">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <div className="text-base font-semibold text-white">
-                      {dayjs(selectedDay).format("dddd, DD [de] MMMM YYYY")}
-                    </div>
-                    <div className="text-sm text-white/70 mt-1">
-                      Trades realizados neste dia
-                    </div>
-                  </div>
-                  <div className="text-xl font-bold text-[#10b981] whitespace-nowrap">
-                    {formatPnl(selectedPnl ?? 0)}
-                  </div>
-                </div>
-
-                {tradesForSelectedDay.length === 0 ? (
-                  <p className="text-sm text-white/70">Nenhum trade nesse dia.</p>
-                ) : (
-                  <div className="divide-y divide-border">
-                    {tradesForSelectedDay.map((trade, index) => (
-                      <div
-                        key={`${trade.accountId}-${trade.date}-${trade.symbol}-${index}`}
-                        className="flex justify-between items-center py-2 text-sm"
-                      >
-                        <span className="text-white flex items-center gap-2">
-                          {trade.symbol}
-                          <span
-                            className={`uppercase text-[10px] font-semibold px-1.5 py-0.5 rounded ${
-                            trade.type === "buy"
-                              ? "bg-green-600/20 text-[#10b981]"
-                              : "bg-red-600/20 text-[#ef4444]"
-                          }`}
-                          >
-                            {trade.type.toUpperCase()}
-                          </span>
-                        </span>
-                        <span
-                          className={
-                            trade.profit > 0
-                              ? "text-[#10b981] font-medium"
-                              : trade.profit < 0
-                              ? "text-[#ef4444] font-medium"
-                              : "text-white"
-                          }
-                        >
-                          {trade.profit.toLocaleString("pt-BR", {
-                            style: "currency",
-                            currency: "USD",
-                          })}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          )}
         </AnimatePresence>
       </div>
     </div>

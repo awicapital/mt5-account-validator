@@ -1,108 +1,147 @@
+// src/app/(public)/login/page.tsx
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { supabase } from "@/lib/supabase";
+
+import { FaDiscord } from "react-icons/fa";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
-import { toast } from "sonner";
-import Link from "next/link";
-import { supabase } from "@/lib/supabase";
-import { useRouter } from "next/navigation";
+import { Switch } from "@/components/ui/switch";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
+  const [remember, setRemember] = useState(false);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+
   const handleLogin = async () => {
     setLoading(true);
-
     if (!email || !senha) {
       toast.error("Preencha todos os campos.");
       setLoading(false);
       return;
     }
-
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password: senha,
-    });
-
-    if (error) {
-      toast.error("Email ou senha inválidos.");
-    } else {
-      toast.success("Login realizado com sucesso!");
+    const { error } = await supabase.auth.signInWithPassword({ email, password: senha });
+    if (error) toast.error(error.message);
+    else {
+      toast.success("Login realizado!");
       router.push("/dashboard-m");
     }
-
     setLoading(false);
   };
 
+  const handleDiscordLogin = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({ provider: "discord" });
+    if (error) toast.error("Erro ao entrar com Discord: " + error.message);
+  };
+
   return (
-    <main className="min-h-screen flex items-center justify-center bg-card px-4">
-      <Card className="w-full max-w-sm border-0 shadow-none">
-        <CardContent className="p-6 space-y-6">
-          {/* Logo */}
-          <div className="flex justify-center mb-4">
-            <Image
-              src="/logo_extendida.png"
-              alt="Logo Awi Capital"
-              width={200}
-              height={60}
-              priority
-            />
-          </div>
+    <main className="fixed inset-0 grid place-items-center bg-gradient-to-br from-[#03182f] via-[#09172c] to-[#0a1121] overflow-hidden px-4">
+      <div className="w-full max-w-md">
+        <Card className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl shadow-lg">
+          <CardContent className="px-8 py-10 space-y-6">
+            {/* Logo */}
+            <div className="flex justify-center">
+              <Image
+                src="/logo_extendida.png"
+                alt="Logo AWI Club"
+                width={200}
+                height={60}
+                priority
+              />
+            </div>
 
-          {/* Chamada amigável abaixo da logo */}
-          <p className="text-center text-sm text-muted-foreground">
-            Entre na sua conta para continuar
-          </p>
+            {/* Saudação */}
+            <h2 className="text-xl font-semibold text-white text-center">
+              Olá! Acesse sua conta
+            </h2>
+            <p className="text-center text-sm text-gray-300">Entre para continuar</p>
 
-          {/* Formulário */}
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="seu@email.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </div>
+            {/* Formulário de email/senha */}
+            <form onSubmit={e => { e.preventDefault(); handleLogin(); }} className="space-y-4">
+              <div className="flex flex-col space-y-1">
+                <Label htmlFor="email" className="text-gray-200">E-mail</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="seu@email.com"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  className="bg-white/20 placeholder-gray-400 placeholder:text-sm text-white focus:bg-white/30 transition-colors duration-200"
+                />
+              </div>
+              <div className="flex flex-col space-y-1">
+                <Label htmlFor="senha" className="text-gray-200">Senha</Label>
+                <Input
+                  id="senha"
+                  type="password"
+                  placeholder="••••••••"
+                  value={senha}
+                  onChange={e => setSenha(e.target.value)}
+                  className="bg-white/20 placeholder-gray-400 placeholder:text-sm text-white focus:bg-white/30 transition-colors duration-200"
+                />
+              </div>
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="remember"
+                  checked={remember}
+                  onCheckedChange={setRemember}
+                  className="border-gray-600 bg-gray-800"
+                />
+                <Label htmlFor="remember" className="text-sm text-gray-300">Lembrar-me</Label>
+              </div>
+              <Button
+                type="submit"
+                className="w-full py-2 bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-lg shadow-md transition-colors duration-200"
+                disabled={loading}
+              >
+                {loading ? "Entrando..." : "Entrar"}
+              </Button>
+            </form>
 
-          <div className="space-y-2">
-            <Label htmlFor="senha">Senha</Label>
-            <Input
-              id="senha"
-              type="password"
-              placeholder="••••••••"
-              value={senha}
-              onChange={(e) => setSenha(e.target.value)}
-            />
-          </div>
+{/* Botão Discord OAuth */}
+<div className="pt-6">
+  <Button
+    onClick={handleDiscordLogin}
+    className="
+      flex items-center justify-center gap-2
+      w-full py-2
+      bg-[#5865F2]/20 backdrop-blur-sm
+      border border-[#5865F2]/50
+      text-white              /* texto em branco */
+      font-semibold rounded-lg shadow-md
+      hover:bg-[#5865F2]/30 transition-all duration-200
+    "
+  >
+    <FaDiscord size={20} color="#FFF" />  {/* ícone em branco */}
+    Entrar com Discord
+  </Button>
+</div>
 
-          <Button
-            className="w-full mt-2"
-            onClick={handleLogin}
-            disabled={loading}
-          >
-            {loading ? "Entrando..." : "Entrar"}
-          </Button>
-
-          <p className="text-center text-sm text-muted-foreground">
-            Ainda não tem conta?{" "}
-            <Link
-              href="/register"
-              className="text-blue-600 hover:underline font-medium"
-            >
-              Criar conta
-            </Link>
-          </p>
-        </CardContent>
-      </Card>
+            {/* Link para registro */}
+            <p className="mt-4 text-center text-sm text-gray-400">
+              Ainda não tem conta?{" "}
+              <Link href="/register" className="text-blue-400 hover:underline font-medium">
+                Criar conta
+              </Link>
+            </p>
+          </CardContent>
+        </Card>
+      </div>
     </main>
   );
 }

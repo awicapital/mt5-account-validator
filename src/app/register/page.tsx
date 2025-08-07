@@ -1,14 +1,16 @@
+// src/app/(public)/register/page.tsx
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { supabase } from "@/lib/supabase";
+
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
-import { toast } from "sonner";
-import Link from "next/link";
-import { supabase } from "@/lib/supabase";
-import { useRouter } from "next/navigation";
 
 export default function RegisterPage() {
   const [nome, setNome] = useState("");
@@ -16,6 +18,15 @@ export default function RegisterPage() {
   const [senha, setSenha] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+
+  // bloqueia scroll no body enquanto a página estiver montada
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
 
   const handleRegister = async () => {
     if (!nome || !email || !senha) {
@@ -27,9 +38,7 @@ export default function RegisterPage() {
     const { data, error } = await supabase.auth.signUp({
       email,
       password: senha,
-      options: {
-        data: { nome },
-      },
+      options: { data: { nome } },
     });
 
     if (error) {
@@ -40,9 +49,8 @@ export default function RegisterPage() {
 
     if (data.user) {
       const { error: updateError } = await supabase.auth.updateUser({
-        data: { nome }, // Atualiza o nome no user_metadata
+        data: { nome },
       });
-
       if (updateError) {
         toast.error("Erro ao atualizar nome: " + updateError.message);
       }
@@ -50,83 +58,125 @@ export default function RegisterPage() {
 
     toast.success("Conta criada com sucesso!");
     setLoading(false);
-    router.push("/dashboard");
+    router.push("/dashboard-m");
   };
 
   return (
     <main
-      className="min-h-screen flex items-center justify-center px-4"
-      style={{ backgroundColor: "#03182f" }}
+      className="
+        fixed inset-0
+        grid place-items-center
+        bg-gradient-to-br from-[#03182f] via-[#09172c] to-[#0a1121]
+        overflow-hidden px-4
+      "
     >
-      <Card className="w-full max-w-sm rounded-lg bg-[#03182f] border-0 shadow-none">
-        <CardContent className="p-6 space-y-6">
-          <h1 className="text-2xl font-semibold text-center text-white">Criar conta</h1>
+      <div className="w-full max-w-md">
+        <Card className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl shadow-lg">
+          <CardContent className="px-8 py-10 space-y-6">
+            {/* Cabeçalho sem logo */}
+            <div className="flex flex-col items-center space-y-2">
+              <h2 className="text-xl font-semibold text-white">
+                Criar conta
+              </h2>
+              <p className="text-center text-sm text-gray-300">
+                Insira seus dados para criar a conta
+              </p>
+            </div>
 
-          <p className="text-center text-sm text-muted-foreground -mt-2 mb-4">
-            Insira seus dados para criar a conta
-          </p>
-
-          <div className="space-y-2">
-            <Label htmlFor="nome" className="text-white">
-              Nome
-            </Label>
-            <Input
-              id="nome"
-              type="text"
-              placeholder="Seu nome completo"
-              value={nome}
-              onChange={(e) => setNome(e.target.value)}
-              autoComplete="name"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="email" className="text-white">
-              Email
-            </Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="seu@email.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              autoComplete="email"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="senha" className="text-white">
-              Senha
-            </Label>
-            <Input
-              id="senha"
-              type="password"
-              placeholder="••••••••"
-              value={senha}
-              onChange={(e) => setSenha(e.target.value)}
-              autoComplete="new-password"
-            />
-          </div>
-
-          <Button
-            className="w-full mt-2"
-            onClick={handleRegister}
-            disabled={loading}
-          >
-            {loading ? "Criando..." : "Criar conta"}
-          </Button>
-
-          <p className="text-center text-sm text-muted-foreground">
-            Já tem uma conta?{" "}
-            <Link
-              href="/login"
-              className="text-blue-600 hover:underline font-medium"
+            {/* Formulário */}
+            <form
+              className="space-y-4"
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleRegister();
+              }}
             >
-              Entrar
-            </Link>
-          </p>
-        </CardContent>
-      </Card>
+              <div className="flex flex-col space-y-1">
+                <Label htmlFor="nome" className="text-gray-200">
+                  Nome
+                </Label>
+                <Input
+                  id="nome"
+                  type="text"
+                  placeholder="Seu nome completo"
+                  value={nome}
+                  onChange={(e) => setNome(e.target.value)}
+                  className="
+                    bg-white/20
+                    placeholder-gray-400 placeholder:text-sm
+                    text-white
+                    focus:bg-white/30
+                    transition-colors duration-200
+                  "
+                />
+              </div>
+              <div className="flex flex-col space-y-1">
+                <Label htmlFor="email" className="text-gray-200">
+                  E-mail
+                </Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="seu@email.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="
+                    bg-white/20
+                    placeholder-gray-400 placeholder:text-sm
+                    text-white
+                    focus:bg-white/30
+                    transition-colors duration-200
+                  "
+                />
+              </div>
+              <div className="flex flex-col space-y-1">
+                <Label htmlFor="senha" className="text-gray-200">
+                  Senha
+                </Label>
+                <Input
+                  id="senha"
+                  type="password"
+                  placeholder="••••••••"
+                  value={senha}
+                  onChange={(e) => setSenha(e.target.value)}
+                  className="
+                    bg-white/20
+                    placeholder-gray-400 placeholder:text-sm
+                    text-white
+                    focus:bg-white/30
+                    transition-colors duration-200
+                  "
+                />
+              </div>
+
+              <Button
+                type="submit"
+                className="
+                  w-full py-2
+                  bg-blue-500 hover:bg-blue-600
+                  text-white font-medium
+                  rounded-lg shadow-md
+                  transition-colors duration-200
+                "
+                disabled={loading}
+              >
+                {loading ? "Criando..." : "Criar conta"}
+              </Button>
+            </form>
+
+            {/* Link de login */}
+            <p className="mt-4 text-center text-sm text-gray-400">
+              Já tem conta?{" "}
+              <Link
+                href="/login"
+                className="text-blue-400 hover:underline font-medium"
+              >
+                Entrar
+              </Link>
+            </p>
+          </CardContent>
+        </Card>
+      </div>
     </main>
   );
 }
