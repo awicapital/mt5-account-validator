@@ -19,10 +19,10 @@ export default function MobileNav() {
   return (
     <nav
       className={clsx(
-        // em vez de bottom-0:
-        "fixed left-0 right-0 bottom-[env(safe-area-inset-bottom)]",
+        // fixa e “puxa pra cima” acrescentando 1rem ao safe‐area
+        "fixed left-0 right-0 bottom-[calc(env(safe-area-inset-bottom)+1rem)]",
         "z-50 bg-[#03182f] flex justify-around items-center px-4",
-        // altura fixa (sem padding extra)
+        // altura fixa do menu
         "h-[64px]"
       )}
     >
