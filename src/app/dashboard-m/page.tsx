@@ -133,7 +133,8 @@ export default function DashboardMPage() {
   }
 
   return (
-    <div className="pb-6 bg-[#03182f] min-h-dvh space-y-6 lg:px-8 text-white">
+    // Adiciona padding bottom para nav bar e safe area
+    <div className="pb-24 bg-[#03182f] min-h-dvh space-y-6 lg:px-8 text-white">
       {/* Card principal de PnL */}
       <DashboardPnLCard
         balance={balance}
@@ -152,7 +153,7 @@ export default function DashboardMPage() {
 
       {/* Cards por conta para o dia selecionado */}
       {selectedDay && (
-        <div className="mt-6 space-y-6">
+        <div className="relative z-20 mt-6 space-y-6">
           {Object.entries(tradesByAccount).map(([accountId, trades]) => {
             // dia da semana com inicial maiúscula
             const weekday = dayjs(selectedDay).format("dddd");
