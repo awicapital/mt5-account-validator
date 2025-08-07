@@ -8,7 +8,7 @@ const navItems = [
   { label: "Início", href: "/dashboard-m", icon: Home },
   { label: "Contas", href: "/accounts-m", icon: List },
   { label: "IA", href: "/agents-m", icon: Bot },
-  { label: "Cursos", href: "/courses", icon: GraduationCap }, // Atualizado
+  { label: "Cursos", href: "/courses", icon: GraduationCap },
   { label: "Perfil", href: "/profile-m", icon: User },
 ];
 
@@ -17,7 +17,15 @@ export default function MobileNav() {
   const router = useRouter();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-[#03182f] flex justify-around items-center h-[64px] px-4">
+    <nav
+      className={clsx(
+        // em vez de bottom-0:
+        "fixed left-0 right-0 bottom-[env(safe-area-inset-bottom)]",
+        "z-50 bg-[#03182f] flex justify-around items-center px-4",
+        // altura fixa (sem padding extra)
+        "h-[64px]"
+      )}
+    >
       {navItems.map(({ label, href, icon: Icon }) => {
         const isActive = pathname === href;
         return (
