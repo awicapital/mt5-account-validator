@@ -4,35 +4,34 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSwipeable } from "react-swipeable";
 import { motion, useAnimation, useMotionValue, useTransform } from "framer-motion";
-import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Loader2, Server, Eye, EyeOff, Trash2, Plus } from "lucide-react";
+import { Loader2, Trash2, Plus } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
+import { AccountCard } from "@/components/ui/account-card";
+import { fetchAccountsData } from "@/lib/accountsData";
 
 interface Account {
   id: string;
   account_number: string;
-  balance: number | null;
+  balance: number;
   ea_name?: string;
   is_active: boolean;
   pnl_total?: number;
+  sparkline?: number[];
 }
 
-function AccountCard({
-  account,
-  showBalance,
-  onDelete,
-}: {
+type SwipeableAccountCardProps = {
   account: Account;
-  showBalance: boolean;
   onDelete: () => void;
-}) {
+  onOpen: () => void;
+};
+
+function SwipeableAccountCard({ account, onDelete, onOpen }: SwipeableAccountCardProps) {
   const x = useMotionValue(0);
   const controls = useAnimation();
-  const bgColor = useTransform(x, [-100, 0], ["#7f1d1d", "#131f35"]);
-  const router = useRouter();
+  const bgColor = useTransform(x, [-100, 0], ["#7f1d1d", account.is_active ? "#131f35" : "#4d4d1f"]);
 
   const swipeHandlers = useSwipeable({
     onSwiping: (e) => {
@@ -45,55 +44,37 @@ function AccountCard({
       await controls.start({ x: 0, opacity: 1 });
     },
     onSwipedRight: () => x.set(0),
+    onTap: () => account.is_active && onOpen(), // só abre detalhes se ativa
     preventScrollOnSwipe: true,
     trackMouse: true,
   });
 
-  const goToDetails = () => router.push(`/accounts-details-m/${account.account_number}`);
-
   return (
     <motion.div
       {...swipeHandlers}
+      onClick={() => account.is_active && onOpen()}
+      role="button"
+      tabIndex={0}
+      whileTap={{ scale: 0.99 }}
       animate={controls}
       style={{ x, backgroundColor: bgColor }}
-      className="overflow-hidden rounded-xl cursor-pointer"
-      onClick={goToDetails}
+      className={`overflow-hidden rounded-xl cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#268bff]/60 ${
+        account.is_active ? "" : "bg-yellow-500/20 border border-yellow-400"
+      }`}
+      aria-label={
+        account.is_active
+          ? `Abrir detalhes da conta ${account.account_number}`
+          : `Conta ${account.account_number} pendente de aprovação`
+      }
     >
-      <Card className="bg-transparent border border-[#1f2c44] text-white">
-        <CardContent className="flex items-center justify-between p-4 space-x-4">
-          <div className="bg-[#1e2b45] p-2 rounded-lg">
-            <Server className="w-6 h-6 text-white" />
-          </div>
-          <div className="flex-1">
-            <div className="text-sm font-medium">
-              #{account.account_number} — {account.ea_name || "Sem EA"}
-            </div>
-            <div className={`text-xs font-semibold mt-1 ${account.is_active ? "text-green-400" : "text-yellow-400"}`}>
-              {account.is_active ? "Ativa" : "Pendente"}
-            </div>
-          </div>
-          <div className="text-right">
-            <div className="text-sm font-semibold">
-              {showBalance ? `$${account.balance?.toFixed(2) || "—"}` : "••••"}
-            </div>
-            <div
-              className={`text-xs font-semibold ${
-                account.pnl_total !== undefined
-                  ? account.pnl_total > 0
-                    ? "text-green-400"
-                    : account.pnl_total < 0
-                    ? "text-red-400"
-                    : "text-muted-foreground"
-                  : "text-muted-foreground"
-              }`}
-            >
-              {account.pnl_total !== undefined
-                ? `${account.pnl_total > 0 ? "+$" : "-$"}${Math.abs(account.pnl_total).toFixed(2)}`
-                : "PNL total"}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {account.is_active ? (
+  <AccountCard account={account} className="bg-[#1e2b45]" />
+) : (
+  <div className="flex flex-col items-center justify-center h-20 text-yellow-300 text-sm font-medium gap-1">
+    <span>Pending Approval</span>
+    <span className="text-xs opacity-80">Account: {account.account_number}</span>
+  </div>
+)}
     </motion.div>
   );
 }
@@ -102,7 +83,6 @@ export default function AccountsPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [showBalance, setShowBalance] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [requestDialogOpen, setRequestDialogOpen] = useState(false);
@@ -113,39 +93,64 @@ export default function AccountsPage() {
     const { data: user } = await supabase.auth.getUser();
     if (!user?.user?.email) return router.push("/login");
 
-    const { data } = await supabase.from("accounts").select("*").eq("email", user.user.email);
-    if (!data) return;
+    // 1) Busca contas no banco
+    const { data: accRows } = await supabase
+      .from("accounts")
+      .select("*")
+      .eq("email", user.user.email);
 
-    const enhancedAccounts = await Promise.all(
-      data.map(async (account: Account) => {
-        try {
-          const path = `${account.account_number}.json`;
-          const { data: urlData } = supabase.storage.from("logs").getPublicUrl(path);
-          if (!urlData?.publicUrl) return account;
+    if (!accRows) {
+      setAccounts([]);
+      setLoading(false);
+      return;
+    }
 
-          const res = await fetch(urlData.publicUrl);
-          if (!res.ok) return account;
+    // 2) Busca dados de trades/dailyPnls
+    const accountsData = await fetchAccountsData();
+    if (!accountsData) {
+      // Sem dados: mostra contas com fallback
+      setAccounts(
+        accRows.map((acct) => ({
+          ...acct,
+          balance: acct.balance ?? 0,
+          pnl_total: null,
+          sparkline: [],
+        }))
+      );
+      setLoading(false);
+      return;
+    }
 
-          const trades: { profit: number; type: string; date: string }[] = await res.json();
-          let pnl = 0;
+    // 3) Agrupa PnL diário por conta
+    const dailyPnlsByAcc: Record<string, Record<string, number>> = {};
+    for (const t of accountsData.trades) {
+      if (t.type === "deposit") continue; // depósitos não contam no PnL
+      const day = t.date.split("T")[0];
+      const accId = String(t.accountId);
+      if (!dailyPnlsByAcc[accId]) dailyPnlsByAcc[accId] = {};
+      dailyPnlsByAcc[accId][day] = (dailyPnlsByAcc[accId][day] || 0) + t.profit;
+    }
 
-          for (const trade of trades) {
-            if (trade.type !== "deposit") {
-              pnl += trade.profit;
-            }
-          }
+    // 4) Monta lista final com cálculos individuais
+    const enhanced: Account[] = accRows.map((acct) => {
+      const accId = String(acct.account_number);
+      const dayMap = dailyPnlsByAcc[accId] || {};
+      const sortedDays = Object.keys(dayMap).sort();
+      let cumulative = 0;
+      const sparkline = sortedDays.map((day) => {
+        cumulative += dayMap[day];
+        return cumulative;
+      });
 
-          return {
-            ...account,
-            pnl_total: pnl,
-          };
-        } catch {
-          return account;
-        }
-      })
-    );
+      return {
+        ...acct,
+        balance: acct.balance ?? 0,
+        pnl_total: sparkline.length ? sparkline[sparkline.length - 1] : null,
+        sparkline,
+      };
+    });
 
-    setAccounts(enhancedAccounts);
+    setAccounts(enhanced);
     setLoading(false);
   };
 
@@ -153,36 +158,34 @@ export default function AccountsPage() {
     fetchAccounts();
   }, []);
 
-  const totalBalance = accounts.reduce((sum, acc) => sum + (acc.balance || 0), 0);
-  const pnlTotal = accounts.reduce((sum, acc) => sum + (acc.pnl_total || 0), 0);
-  const pnlBase = totalBalance - pnlTotal;
-  const pnlPercent = pnlBase > 0 ? (pnlTotal / pnlBase) * 100 : 0;
-
   const handleDelete = async () => {
     if (!selectedAccount) return;
     setDialogOpen(false);
     await supabase.from("accounts").delete().eq("id", selectedAccount.id);
     toast.success("Conta excluída com sucesso!");
-    await fetchAccounts();
+    fetchAccounts();
   };
 
-  const handleSubmit = async () => {
+  const handleRequest = async () => {
     if (!accountNumber) return toast.error("Informe o número da conta.");
     setSubmitting(true);
     const { data: user } = await supabase.auth.getUser();
     const email = user?.user?.email;
     if (!email) return;
+
     const { error } = await supabase.from("accounts").insert({
       account_number: Number(accountNumber),
       email,
       requested_at: new Date().toISOString(),
       is_active: false,
     });
+
     setSubmitting(false);
     if (error) return toast.error("Erro ao solicitar conta.");
+
     setRequestDialogOpen(false);
     setAccountNumber("");
-    await fetchAccounts();
+    fetchAccounts();
     toast.success("Solicitação enviada com sucesso!");
   };
 
@@ -195,41 +198,28 @@ export default function AccountsPage() {
   }
 
   return (
-    <div className="p-4 bg-[#03182f] min-h-dvh space-y-6 pb-28">
-      <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-white">Saldo Total</h1>
-        <button onClick={() => setShowBalance(!showBalance)} className="text-white">
-          {showBalance ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
-        </button>
-      </div>
+    <div className="pt-4 pb-28 bg-[#03182f] min-h-dvh space-y-6">
+      <h1 className="text-sm font-semibold text-white">Minhas Contas</h1>
 
-      <div className="text-center">
-        <div className="text-4xl font-bold text-white">
-          {showBalance ? `$${totalBalance.toFixed(2)}` : "••••"}
+      {accounts.length === 0 ? (
+        <div className="text-center text-muted-foreground text-sm mt-10">
+          Nenhuma conta cadastrada.
         </div>
-        <div
-          className={`text-sm mt-1 ${
-            pnlPercent > 0 ? "text-green-400" : pnlPercent < 0 ? "text-red-400" : "text-muted-foreground"
-          }`}
-        >
-          {showBalance ? `${pnlTotal >= 0 ? "+" : ""}${pnlPercent.toFixed(2)}%` : ""}
+      ) : (
+        <div className="space-y-4">
+          {accounts.map((account) => (
+            <SwipeableAccountCard
+              key={account.id}
+              account={account}
+              onDelete={() => {
+                setSelectedAccount(account);
+                setDialogOpen(true);
+              }}
+              onOpen={() => router.push(`/accounts-details-m/${account.account_number}`)}
+            />
+          ))}
         </div>
-      </div>
-
-      <h2 className="text-lg font-semibold text-white pt-2">Minhas Contas</h2>
-      <div className="space-y-4">
-        {accounts.map((account) => (
-          <AccountCard
-            key={account.id}
-            account={account}
-            showBalance={showBalance}
-            onDelete={() => {
-              setSelectedAccount(account);
-              setDialogOpen(true);
-            }}
-          />
-        ))}
-      </div>
+      )}
 
       <button
         className="fixed z-50 bottom-24 right-6 bg-[#268bff] hover:bg-[#1e78e0] text-white rounded-full p-4 shadow-lg"
@@ -239,6 +229,7 @@ export default function AccountsPage() {
         <Plus className="w-5 h-5" />
       </button>
 
+      {/* Dialog de exclusão */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="bg-[#131f35] border border-[#1f2c44]">
           <DialogHeader>
@@ -257,6 +248,7 @@ export default function AccountsPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Dialog de solicitação */}
       <Dialog open={requestDialogOpen} onOpenChange={setRequestDialogOpen}>
         <DialogContent className="bg-[#131f35] border border-[#1f2c44]">
           <DialogHeader>
@@ -279,7 +271,7 @@ export default function AccountsPage() {
           <DialogFooter className="flex justify-center mt-6">
             <Button
               className="bg-[#268bff] hover:bg-[#1e78e0] text-white w-full"
-              onClick={handleSubmit}
+              onClick={handleRequest}
               disabled={submitting}
             >
               <Plus className="w-4 h-4 mr-2" />

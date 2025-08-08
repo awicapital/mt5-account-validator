@@ -213,29 +213,34 @@ export default function AccountDetailsPage() {
   ]
 
   return (
-    <div className="p-6 bg-[#03182f] min-h-dvh pb-32 space-y-10">
-      <div className="flex items-center gap-3 mb-4">
+    <div className="pt-4 pb-28 bg-[#03182f] min-h-dvh space-y-6">
+      {/* Header compacto, alinhado à outra page */}
+      <div className="flex items-center gap-3 px-4">
         <button
           onClick={() => router.back()}
           className="text-white p-2 rounded-full hover:bg-white/10 transition"
+          aria-label="Voltar"
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
-        <div className="text-white space-y-1">
-          <h1 className="text-2xl font-bold leading-tight">Conta #{accountNumber}</h1>
+        <div className="text-white">
+          <h1 className="text-sm font-semibold">Account #{accountNumber}</h1>
           {lastUpdated && (
-            <p className="text-sm text-muted-foreground">
-              Última atualização: {new Date(lastUpdated).toLocaleString('pt-BR')}
+            <p className="text-xs text-muted-foreground">
+              Last update: {new Date(lastUpdated).toLocaleString('pt-BR')}
             </p>
           )}
         </div>
       </div>
 
-      <AccountResumeCard currentBalance={currentBalance} pnlTotal={pnlTotal} />
-      <AccountChartCard mode={mode} onChangeMode={setMode} logs={mode === 'profit' ? logs : growthLogs} />
-      <AccountMetricsCard metrics={metrics} />
-      <AccountSymbolsChart data={Object.values(statsBySymbol)} />
-      <AccountHistoryCard trades={trades} />
+      {/* Conteúdo */}
+      <div className="space-y-6 px-4">
+        <AccountResumeCard currentBalance={currentBalance} pnlTotal={pnlTotal} />
+        <AccountChartCard mode={mode} onChangeMode={setMode} logs={mode === 'profit' ? logs : growthLogs} />
+        <AccountMetricsCard metrics={metrics} />
+        <AccountSymbolsChart data={Object.values(statsBySymbol)} />
+        <AccountHistoryCard trades={trades} />
+      </div>
     </div>
   )
 }
