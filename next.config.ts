@@ -5,19 +5,21 @@ import type { NextConfig } from "next";
 
 const isProd = process.env.NODE_ENV === "production";
 
-// 1) Defina apenas as opções do PWA aqui:
+// 1) Opções do PWA
 const pwaConfig = {
   dest: "public",
   register: true,
   skipWaiting: true,
-  disable: !isProd,
+  disable: !isProd, // desabilita PWA no dev
 };
 
+// 2) Next config (sem swcMinify)
 const nextConfig: NextConfig = {
   reactStrictMode: true,
-  swcMinify: true,
 
-  // 2) Exemplo de alias de import
+  // Descomente TEMPORARIAMENTE se precisar passar o build enquanto corrige lints:
+  // eslint: { ignoreDuringBuilds: true },
+
   webpack(config) {
     config.resolve.alias = {
       ...(config.resolve.alias || {}),
@@ -27,5 +29,5 @@ const nextConfig: NextConfig = {
   },
 };
 
-// 3) Envolva o nextConfig com as opções do PWA
+// 3) Exporta com PWA aplicado
 export default withPWA(pwaConfig)(nextConfig);

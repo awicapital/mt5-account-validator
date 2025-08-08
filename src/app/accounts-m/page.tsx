@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSwipeable } from "react-swipeable";
 import { motion, useAnimation, useMotionValue, useTransform } from "framer-motion";
@@ -44,7 +44,7 @@ function SwipeableAccountCard({ account, onDelete, onOpen }: SwipeableAccountCar
       await controls.start({ x: 0, opacity: 1 });
     },
     onSwipedRight: () => x.set(0),
-    onTap: () => account.is_active && onOpen(), // só abre detalhes se ativa
+    onTap: () => account.is_active && onOpen(),
     preventScrollOnSwipe: true,
     trackMouse: true,
   });
@@ -68,13 +68,13 @@ function SwipeableAccountCard({ account, onDelete, onOpen }: SwipeableAccountCar
       }
     >
       {account.is_active ? (
-  <AccountCard account={account} className="bg-[#1e2b45]" />
-) : (
-  <div className="flex flex-col items-center justify-center h-20 text-yellow-300 text-sm font-medium gap-1">
-    <span>Pending Approval</span>
-    <span className="text-xs opacity-80">Account: {account.account_number}</span>
-  </div>
-)}
+        <AccountCard account={account} className="bg-[#1e2b45]" />
+      ) : (
+        <div className="flex flex-col items-center justify-center h-20 text-yellow-300 text-sm font-medium gap-1">
+          <span>Pending Approval</span>
+          <span className="text-xs opacity-80">Account: {account.account_number}</span>
+        </div>
+      )}
     </motion.div>
   );
 }
@@ -89,9 +89,12 @@ export default function AccountsPage() {
   const [accountNumber, setAccountNumber] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  const fetchAccounts = async () => {
+  const fetchAccounts = useCallback(async () => {
     const { data: user } = await supabase.auth.getUser();
-    if (!user?.user?.email) return router.push("/login");
+    if (!user?.user?.email) {
+      router.push("/login");
+      return;
+    }
 
     // 1) Busca contas no banco
     const { data: accRows } = await supabase
@@ -108,7 +111,6 @@ export default function AccountsPage() {
     // 2) Busca dados de trades/dailyPnls
     const accountsData = await fetchAccountsData();
     if (!accountsData) {
-      // Sem dados: mostra contas com fallback
       setAccounts(
         accRows.map((acct) => ({
           ...acct,
@@ -124,14 +126,14 @@ export default function AccountsPage() {
     // 3) Agrupa PnL diário por conta
     const dailyPnlsByAcc: Record<string, Record<string, number>> = {};
     for (const t of accountsData.trades) {
-      if (t.type === "deposit") continue; // depósitos não contam no PnL
+      if (t.type === "deposit") continue;
       const day = t.date.split("T")[0];
       const accId = String(t.accountId);
       if (!dailyPnlsByAcc[accId]) dailyPnlsByAcc[accId] = {};
       dailyPnlsByAcc[accId][day] = (dailyPnlsByAcc[accId][day] || 0) + t.profit;
     }
 
-    // 4) Monta lista final com cálculos individuais
+    // 4) Monta lista final
     const enhanced: Account[] = accRows.map((acct) => {
       const accId = String(acct.account_number);
       const dayMap = dailyPnlsByAcc[accId] || {};
@@ -152,11 +154,11 @@ export default function AccountsPage() {
 
     setAccounts(enhanced);
     setLoading(false);
-  };
+  }, [router]); // deps reais usadas dentro
 
   useEffect(() => {
     fetchAccounts();
-  }, []);
+  }, [fetchAccounts]); // ✅ sem warning
 
   const handleDelete = async () => {
     if (!selectedAccount) return;
