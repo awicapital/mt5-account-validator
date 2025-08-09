@@ -2,7 +2,7 @@ import { supabase } from "./supabase";
 
 export interface Trade {
   id: string;
-  date: string; // sempre ISO: "YYYY-MM-DDTHH:mm:ss.sssZ"
+  date: string; // ISO "YYYY-MM-DDTHH:mm:ss.sssZ"
   type: string;
   profit: number;
   accountId: string;
@@ -16,14 +16,30 @@ export interface AccountsData {
   totalDeposits: number;
 }
 
+// Tipagem flexível do JSON cru do storage
+type RawTrade = {
+  date?: unknown;
+  type?: unknown;
+  profit?: unknown;
+  symbol?: unknown;
+  volume?: unknown;
+};
+
+// Type guard: aceita objetos, exige profit number e presença de date
+function isParsableRawTrade(x: unknown): x is RawTrade & { profit: number; date: unknown } {
+  if (!x || typeof x !== "object") return false;
+  const obj = x as Record<string, unknown>;
+  return typeof obj.profit === "number" && "date" in obj;
+}
+
 export async function fetchAccountsData(): Promise<AccountsData | null> {
   try {
-    // 1) Pega usuário autenticado
+    // 1) Usuário autenticado
     const { data: session } = await supabase.auth.getUser();
     const email = session?.user?.email;
     if (!email) return null;
 
-    // 2) Busca as contas do usuário
+    // 2) Contas do usuário
     const { data: accounts, error: accountsError } = await supabase
       .from("accounts")
       .select("account_number")
@@ -39,14 +55,13 @@ export async function fetchAccountsData(): Promise<AccountsData | null> {
     const trades: Trade[] = [];
     let totalDeposits = 0;
 
-    // 3) Para cada conta, busca o JSON de logs (furando cache do CDN) e processa
+    // 3) Para cada conta, baixa e processa o JSON
     for (const accNumber of accountNumbers) {
       const path = `${accNumber}.json`;
       const { data: urlData } = supabase.storage.from("logs").getPublicUrl(path);
       if (!urlData?.publicUrl) continue;
 
       try {
-        // cache‑buster + no-store para sempre pegar a versão mais recente
         const freshUrl = `${urlData.publicUrl}?v=${Date.now()}`;
         const res = await fetch(freshUrl, {
           cache: "no-store",
@@ -54,25 +69,26 @@ export async function fetchAccountsData(): Promise<AccountsData | null> {
         });
         if (!res.ok) continue;
 
-        const raw = await res.json();
+        const raw: unknown = await res.json();
         if (!Array.isArray(raw)) continue;
 
         const parsed: Trade[] = raw
-          .filter((t: any) => t?.date && typeof t?.profit === "number")
-          .map((t: any, idx: number) => {
+          .filter(isParsableRawTrade)
+          .map((t, idx) => {
             // 3.1) Acumula depósitos
-            if (t.type === "deposit") {
+            const typeVal = typeof t.type === "string" ? t.type : "unknown";
+            if (typeVal === "deposit") {
               totalDeposits += t.profit;
             }
 
-            // 3.2) Normaliza rawDate: troca pontos por hífen e espaço por 'T'
-            const rawDate = String(t.date).trim();
+            // 3.2) Normaliza rawDate
+            const rawDate = String(t.date ?? "").trim();
             const withHyphens = rawDate.replace(/\./g, "-");
             const asIsoString = withHyphens.includes("T")
               ? withHyphens
               : withHyphens.replace(" ", "T");
 
-            // 3.3) Gera objeto Date e ISO final
+            // 3.3) ISO final
             const dt = new Date(asIsoString);
             const isoDate = isNaN(dt.getTime())
               ? (() => {
@@ -81,29 +97,31 @@ export async function fetchAccountsData(): Promise<AccountsData | null> {
                 })()
               : dt.toISOString();
 
+            const symbol = typeof t.symbol === "string" ? t.symbol : undefined;
+            const volume = typeof t.volume === "number" ? t.volume : undefined;
+
             return {
               id: `${accNumber}-${isoDate}-${idx}`,
               date: isoDate,
-              type: t.type,
+              type: typeVal,
               profit: t.profit,
-              accountId: accNumber.toString(),
-              symbol: t.symbol,
-              volume: t.volume,
-            } as Trade;
+              accountId: String(accNumber),
+              symbol,
+              volume,
+            };
           });
 
         trades.push(...parsed);
       } catch {
-        // ignora erro naquele arquivo
-        continue;
+        continue; // ignora erro naquele arquivo
       }
     }
 
-    // 4) Monta o dailyPnls (soma por dia, excluindo depósitos)
+    // 4) dailyPnls (exclui depósitos)
     const dailyPnls: Record<string, number> = {};
     for (const t of trades) {
       if (t.type === "deposit") continue;
-      const day = t.date.split("T")[0]; // t.date é ISO
+      const day = t.date.split("T")[0];
       dailyPnls[day] = (dailyPnls[day] || 0) + t.profit;
     }
 
