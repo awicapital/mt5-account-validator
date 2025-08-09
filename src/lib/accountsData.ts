@@ -2,7 +2,7 @@ import { supabase } from "./supabase";
 
 export interface Trade {
   id: string;
-  date: string;    // sempre ISO: "YYYY-MM-DDTHH:mm:ss.sssZ"
+  date: string; // sempre ISO: "YYYY-MM-DDTHH:mm:ss.sssZ"
   type: string;
   profit: number;
   accountId: string;
@@ -28,6 +28,7 @@ export async function fetchAccountsData(): Promise<AccountsData | null> {
       .from("accounts")
       .select("account_number")
       .eq("email", email);
+
     if (accountsError || !accounts) return null;
 
     const accountNumbers = accounts.map((a) => a.account_number);
@@ -38,37 +39,43 @@ export async function fetchAccountsData(): Promise<AccountsData | null> {
     const trades: Trade[] = [];
     let totalDeposits = 0;
 
-    // 3) Para cada conta, busca o JSON de logs e processa
+    // 3) Para cada conta, busca o JSON de logs (furando cache do CDN) e processa
     for (const accNumber of accountNumbers) {
       const path = `${accNumber}.json`;
       const { data: urlData } = supabase.storage.from("logs").getPublicUrl(path);
       if (!urlData?.publicUrl) continue;
 
       try {
-        const res = await fetch(urlData.publicUrl);
+        // cache‑buster + no-store para sempre pegar a versão mais recente
+        const freshUrl = `${urlData.publicUrl}?v=${Date.now()}`;
+        const res = await fetch(freshUrl, {
+          cache: "no-store",
+          headers: { "Cache-Control": "no-cache" },
+        });
         if (!res.ok) continue;
+
         const raw = await res.json();
         if (!Array.isArray(raw)) continue;
 
         const parsed: Trade[] = raw
-          .filter((t) => t.date && typeof t.profit === "number")
-          .map((t, idx) => {
+          .filter((t: any) => t?.date && typeof t?.profit === "number")
+          .map((t: any, idx: number) => {
             // 3.1) Acumula depósitos
             if (t.type === "deposit") {
               totalDeposits += t.profit;
             }
 
             // 3.2) Normaliza rawDate: troca pontos por hífen e espaço por 'T'
-            const rawDate = t.date.trim();
+            const rawDate = String(t.date).trim();
             const withHyphens = rawDate.replace(/\./g, "-");
             const asIsoString = withHyphens.includes("T")
               ? withHyphens
               : withHyphens.replace(" ", "T");
+
             // 3.3) Gera objeto Date e ISO final
             const dt = new Date(asIsoString);
             const isoDate = isNaN(dt.getTime())
-              ? // se ainda inválido, tenta sem 'T'
-                (() => {
+              ? (() => {
                   const dt2 = new Date(withHyphens);
                   return isNaN(dt2.getTime()) ? rawDate : dt2.toISOString();
                 })()
@@ -82,7 +89,7 @@ export async function fetchAccountsData(): Promise<AccountsData | null> {
               accountId: accNumber.toString(),
               symbol: t.symbol,
               volume: t.volume,
-            };
+            } as Trade;
           });
 
         trades.push(...parsed);
@@ -96,8 +103,7 @@ export async function fetchAccountsData(): Promise<AccountsData | null> {
     const dailyPnls: Record<string, number> = {};
     for (const t of trades) {
       if (t.type === "deposit") continue;
-      // t.date agora é ISO => basta splitizar em 'T'
-      const day = t.date.split("T")[0];
+      const day = t.date.split("T")[0]; // t.date é ISO
       dailyPnls[day] = (dailyPnls[day] || 0) + t.profit;
     }
 
