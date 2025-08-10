@@ -65,7 +65,7 @@ export default function UserProfilePage() {
     }
 
     const { data, error } = await supabase
-      .from("users")
+      .from<UserProfile>("users")
       .select("*")
       .eq("id", auth.user.id)
       .single();
@@ -148,8 +148,7 @@ export default function UserProfilePage() {
       });
 
       const filePath = `${user.id}-${Date.now()}`;
-      const { data: up, error: upErr } = await supabase
-        .storage
+      const { data: up, error: upErr } = await supabase.storage
         .from("avatars")
         .upload(filePath, compressed, { cacheControl: "3600", upsert: true });
 
@@ -172,8 +171,9 @@ export default function UserProfilePage() {
 
       toast.success("Avatar atualizado!");
       setUser({ ...user, avatar_url: pub.publicUrl });
-    } catch (err: any) {
-      toast.error(err?.message || "Erro ao enviar imagem");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Erro ao enviar imagem";
+      toast.error(message);
     } finally {
       setUploading(false);
     }
