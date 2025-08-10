@@ -1,12 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSwipeable } from "react-swipeable";
 import { motion, useAnimation, useMotionValue, useTransform } from "framer-motion";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Loader2, Trash2, Plus, RefreshCcw, Search, Filter } from "lucide-react";
+import { Loader2, Trash2, Plus, RefreshCcw, Search } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { AccountCard } from "@/components/ui/account-card";
@@ -31,7 +31,11 @@ type SwipeableAccountCardProps = {
 function SwipeableAccountCard({ account, onDelete, onOpen }: SwipeableAccountCardProps) {
   const x = useMotionValue(0);
   const controls = useAnimation();
-  const bgColor = useTransform(x, [-140, 0, 80], ["#7f1d1d", account.is_active ? "#131f35" : "#4d4d1f", account.is_active ? "#131f35" : "#4d4d1f"]);
+  const bgColor = useTransform(
+    x,
+    [-140, 0, 80],
+    ["#7f1d1d", account.is_active ? "#131f35" : "#4d4d1f", account.is_active ? "#131f35" : "#4d4d1f"]
+  );
   const revealDelete = useTransform(x, [-140, -90, 0], [1, 1, 0]);
 
   const swipeHandlers = useSwipeable({
@@ -51,7 +55,9 @@ function SwipeableAccountCard({ account, onDelete, onOpen }: SwipeableAccountCar
       }
     },
     onSwipedRight: () => controls.start({ x: 0, transition: { type: "spring", stiffness: 260, damping: 24 } }),
-    onTap: () => account.is_active && onOpen(),
+    onTap: () => {
+      if (account.is_active) onOpen();
+    },
     preventScrollOnSwipe: true,
     trackMouse: true,
   });
@@ -59,7 +65,7 @@ function SwipeableAccountCard({ account, onDelete, onOpen }: SwipeableAccountCar
   function handleKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
-      account.is_active && onOpen();
+      if (account.is_active) onOpen();
     }
     if (e.key === "Delete" || e.key === "Backspace") {
       onDelete();
@@ -81,7 +87,9 @@ function SwipeableAccountCard({ account, onDelete, onOpen }: SwipeableAccountCar
 
       <motion.div
         {...swipeHandlers}
-        onClick={() => account.is_active && onOpen()}
+        onClick={() => {
+          if (account.is_active) onOpen();
+        }}
         onKeyDown={handleKeyDown}
         role="button"
         tabIndex={0}
@@ -308,7 +316,7 @@ export default function AccountsPage() {
             ))}
             {filtered.length === 0 && (
               <p className="rounded-xl border border-white/10 bg-white/5 p-4 text-center text-sm text-white/60">
-                Nada encontrado para "{query}".
+                Nada encontrado para &quot;{query}&quot;.
               </p>
             )}
           </div>
@@ -317,6 +325,7 @@ export default function AccountsPage() {
 
       {/* FAB */}
       <button
+        type="button"
         className="fixed bottom-24 right-6 z-50 rounded-full bg-[#268bff] p-4 text-white shadow-lg transition hover:bg-[#1e78e0]"
         onClick={() => setRequestDialogOpen(true)}
         aria-label="Solicitar nova conta"
