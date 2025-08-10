@@ -5,11 +5,11 @@ import { usePathname, useRouter } from "next/navigation";
 import clsx from "clsx";
 
 const navItems = [
-  { label: "Início", href: "/dashboard-m", icon: Home },
-  { label: "Contas", href: "/accounts-m", icon: List },
-  { label: "IA", href: "/agents-m", icon: Bot },
+  { label: "Início", href: "/dashboard", icon: Home },
+  { label: "Contas", href: "/accounts", icon: List },
+  { label: "IA", href: "/agents", icon: Bot },
   { label: "Cursos", href: "/courses", icon: GraduationCap },
-  { label: "Perfil", href: "/profile-m", icon: User },
+  { label: "Perfil", href: "/user-profile", icon: User },
 ];
 
 export default function MobileNav() {

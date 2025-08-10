@@ -19,8 +19,16 @@ export interface AccountCardProps {
   animDurationMs?: number;
 }
 
-const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const num2 = new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const usd = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+const num2 = new Intl.NumberFormat("en-US", {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
 
 function AccountCardBase({
   account,
@@ -31,30 +39,31 @@ function AccountCardBase({
   const pnl = account.pnl_total ?? null;
   const pnlSign = pnl != null && pnl > 0 ? "+" : "";
   const pnlColor =
-    pnl == null ? "text-muted-foreground" : pnl > 0 ? "text-emerald-400" : pnl < 0 ? "text-red-500" : "text-foreground";
+    pnl == null
+      ? "text-muted-foreground"
+      : pnl > 0
+      ? "text-emerald-400"
+      : pnl < 0
+      ? "text-red-500"
+      : "text-foreground";
 
-  // ✅ series memoizada para identidade estável
+  // series memoizada
   const series: number[] = useMemo(() => account.sparkline ?? [], [account.sparkline]);
 
-  // ---- Animação periódica ----
+  // animação periódica
   const [animKey, setAnimKey] = useState(0);
-
-  // ✅ assinatura estável (deps só 'series')
   const seriesSignature = useMemo(() => series.join("|"), [series]);
 
-  // reanima quando dados mudam
   useEffect(() => {
     setAnimKey((k) => k + 1);
   }, [seriesSignature]);
 
-  // reanima de tempos em tempos (se houver dados)
   useEffect(() => {
     if (!series.length) return;
     const id = setInterval(() => setAnimKey((k) => k + 1), refreshMs);
     return () => clearInterval(id);
-  }, [refreshMs, series.length]); // ✅ inclui series.length
+  }, [refreshMs, series.length]);
 
-  // ✅ NUNCA declarar hooks abaixo de returns condicionais
   const data = useMemo(() => series.map((v, i) => ({ i, v })), [series]);
   const avg = useMemo(() => (data.length ? data.reduce((s, p) => s + p.v, 0) / data.length : 0), [data]);
 
@@ -62,13 +71,17 @@ function AccountCardBase({
   if (series.length === 0) {
     return (
       <Card className={`rounded-xl border border-[#1e3a56] bg-[#1e293b] px-4 py-2.5 ${className}`}>
-        <div className="grid grid-cols-[minmax(72px,auto)_1fr_minmax(90px,auto)] items-center gap-y-1 text-[10px] leading-[1.25] text-white">
+        <div className="grid grid-cols-[minmax(72px,auto)_1fr_minmax(96px,auto)] items-center gap-x-3 gap-y-0 text-[10px] leading-tight text-white">
           <span className="text-muted-foreground">Account</span>
           <div />
           <span className="text-muted-foreground text-right">Resume</span>
 
           <span>{account.account_number}</span>
-          <div className="row-span-2 flex items-center justify-center px-3 text-xs text-muted-foreground">Sem dados para exibir</div>
+
+          <div className="row-span-2 flex items-center justify-center px-2 h-10 sm:h-11 md:h-12 lg:h-14 text-xs text-muted-foreground">
+            Sem dados para exibir
+          </div>
+
           <span className="text-right">{usd.format(account.balance)}</span>
 
           <span className="font-semibold">{account.ea_name || "—"}</span>
@@ -83,20 +96,21 @@ function AccountCardBase({
   // === Com dados ===
   return (
     <Card className={`rounded-xl border border-[#1e3a56] bg-[#1e293b] px-4 py-2.5 ${className}`}>
-      <div className="grid grid-cols-[minmax(72px,auto)_1fr_minmax(90px,auto)] items-center gap-y-1 text-[10px] leading-[1.25] text-white">
+      <div className="grid grid-cols-[minmax(72px,auto)_1fr_minmax(96px,auto)] items-center gap-x-3 gap-y-0 text-[10px] leading-tight text-white">
         <span className="text-muted-foreground">Account</span>
         <div />
         <span className="text-muted-foreground text-right">Resume</span>
 
         <span>{account.account_number}</span>
 
-        <div className="row-span-2 flex justify-center px-3">
+        {/* MEIO — gráfico ocupa todo o 1fr, responsivo */}
+        <div className="row-span-2 flex items-center justify-center px-2">
           <motion.div
             key={animKey}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.25 }}
-            className="h-10 w-28 sm:w-32 pointer-events-none"
+            className="h-10 sm:h-11 md:h-12 lg:h-14 w-full pointer-events-none"
             aria-hidden
             aria-label="Mini gráfico de desempenho da conta"
           >

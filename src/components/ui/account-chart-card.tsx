@@ -16,34 +16,16 @@ interface Log {
 }
 
 interface AccountChartProps {
-  mode: 'profit' | 'growth'
-  onChangeMode: (mode: 'profit' | 'growth') => void
   logs: Log[]
 }
 
-export function AccountChartCard({ mode, onChangeMode, logs }: AccountChartProps) {
+export function AccountChartCard({ logs }: AccountChartProps) {
   return (
     <div className="rounded-2xl bg-[#0f1d31] shadow-md p-6 border border-[#1e2c46]">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-white font-semibold text-base">
-          Evolução do {mode === 'profit' ? 'Profit' : 'Growth'}
+          Evolução
         </h2>
-
-        <div className="flex gap-2 bg-[#0f1d31] p-1 rounded-full border border-[#1e2c46]">
-          {(['profit', 'growth'] as const).map((m) => (
-            <button
-              key={m}
-              onClick={() => onChangeMode(m)}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all
-                ${mode === m
-                  ? 'bg-[#2563eb]/20 text-white border border-[#2563eb]'
-                  : 'text-[#8ca3ba] hover:text-white'}
-              `}
-            >
-              {m.charAt(0).toUpperCase() + m.slice(1)}
-            </button>
-          ))}
-        </div>
       </div>
 
       <ResponsiveContainer width="100%" height={300}>
