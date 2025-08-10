@@ -65,7 +65,8 @@ export default function UserProfilePage() {
     }
 
     const { data, error } = await supabase
-      .from<UserProfile>("users")
+      // ✅ corrigido: dois genéricos quando o cliente não é tipado
+      .from<UserProfile, UserProfile>("users")
       .select("*")
       .eq("id", auth.user.id)
       .single();
