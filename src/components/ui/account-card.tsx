@@ -10,7 +10,7 @@ export interface AccountCardProps {
     account_number: string;
     ea_name?: string;
     balance: number;
-    pnl_total?: number;
+    pnl_total?: number | null; // aceita null
     is_active: boolean;
     sparkline?: number[];
   };
@@ -25,9 +25,11 @@ const usd = new Intl.NumberFormat("en-US", {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
 });
+
 const num2 = new Intl.NumberFormat("en-US", {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
+  signDisplay: "exceptZero", // + para positivos, − para negativos, nada para zero
 });
 
 function AccountCardBase({
@@ -37,7 +39,7 @@ function AccountCardBase({
   animDurationMs = 1200,
 }: AccountCardProps) {
   const pnl = account.pnl_total ?? null;
-  const pnlSign = pnl != null && pnl > 0 ? "+" : "";
+
   const pnlColor =
     pnl == null
       ? "text-muted-foreground"
@@ -65,12 +67,19 @@ function AccountCardBase({
   }, [refreshMs, series.length]);
 
   const data = useMemo(() => series.map((v, i) => ({ i, v })), [series]);
-  const avg = useMemo(() => (data.length ? data.reduce((s, p) => s + p.v, 0) / data.length : 0), [data]);
+  const avg = useMemo(
+    () => (data.length ? data.reduce((s, p) => s + p.v, 0) / data.length : 0),
+    [data]
+  );
 
   // === Fallback sem dados ===
   if (series.length === 0) {
     return (
-      <Card className={`rounded-xl border border-[#1e3a56] bg-[#1e293b] px-4 py-2.5 ${className}`}>
+      <Card
+        className={`rounded-xl border border-[#1e3a56] bg-[#1e293b] px-4 py-2.5 ${className}`}
+        role="group"
+        aria-label={`Account ${account.account_number}`}
+      >
         <div className="grid grid-cols-[minmax(72px,auto)_1fr_minmax(96px,auto)] items-center gap-x-3 gap-y-0 text-[10px] leading-tight text-white">
           <span className="text-muted-foreground">Account</span>
           <div />
@@ -86,7 +95,7 @@ function AccountCardBase({
 
           <span className="font-semibold">{account.ea_name || "—"}</span>
           <span className={`font-semibold text-right ${pnlColor}`}>
-            {pnl == null ? "—" : `${pnlSign}${num2.format(Math.abs(pnl))}`}
+            {pnl == null ? "—" : num2.format(pnl)}
           </span>
         </div>
       </Card>
@@ -95,7 +104,11 @@ function AccountCardBase({
 
   // === Com dados ===
   return (
-    <Card className={`rounded-xl border border-[#1e3a56] bg-[#1e293b] px-4 py-2.5 ${className}`}>
+    <Card
+      className={`rounded-xl border border-[#1e3a56] bg-[#1e293b] px-4 py-2.5 ${className}`}
+      role="group"
+      aria-label={`Account ${account.account_number}`}
+    >
       <div className="grid grid-cols-[minmax(72px,auto)_1fr_minmax(96px,auto)] items-center gap-x-3 gap-y-0 text-[10px] leading-tight text-white">
         <span className="text-muted-foreground">Account</span>
         <div />
@@ -139,7 +152,7 @@ function AccountCardBase({
 
         <span className="font-semibold">{account.ea_name || "—"}</span>
         <span className={`font-semibold text-right ${pnlColor}`}>
-          {pnl == null ? "—" : `${pnlSign}${num2.format(Math.abs(pnl))}`}
+          {pnl == null ? "—" : num2.format(pnl)}
         </span>
       </div>
     </Card>
