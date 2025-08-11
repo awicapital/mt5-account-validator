@@ -1,24 +1,21 @@
 "use client";
 
-import Link from "next/link";
-import { ReactNode, useCallback } from "react";
+import { ReactNode, useCallback, MouseEvent } from "react";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 
 interface BackHeaderProps {
-  backHref?: string;          // opcional: se informado, força navegar para esse href
-  fallbackHref?: string;      // para quando não há origem; padrão: /dashboard
+  fallbackHref?: string;      // fallback quando não houver histórico (padrão: /dashboard)
   title?: string;
   rightSlot?: ReactNode;      // ícones/botões no canto direito
   className?: string;
-  sticky?: boolean;           // opcional: deixa colado no topo
-  withBorder?: boolean;       // opcional: mostra/oculta a borda inferior
+  sticky?: boolean;           // deixa colado no topo
+  withBorder?: boolean;       // borda inferior opcional
 }
 
 export function BackHeader({
-  backHref,
   fallbackHref = "/dashboard",
   title,
   rightSlot,
@@ -29,31 +26,15 @@ export function BackHeader({
   const router = useRouter();
 
   const handleBack = useCallback(
-    (e?: React.MouseEvent) => {
+    (e?: MouseEvent) => {
       e?.preventDefault();
+      const canGoBack =
+        typeof window !== "undefined" && window.history.length > 1;
 
-      // Se um backHref explícito foi passado, usa ele sempre
-      if (backHref) {
-        router.push(backHref);
-        return;
-      }
-
-      // Tenta voltar se houver histórico de navegação
-      const hasHistory = typeof window !== "undefined" && window.history.length > 1;
-      const sameOriginReferrer =
-        typeof document !== "undefined" &&
-        !!document.referrer &&
-        new URL(document.referrer).origin === window.location.origin;
-
-      if (hasHistory && sameOriginReferrer) {
-        router.back();
-        return;
-      }
-
-      // Fallback: vai para a home do dashboard
-      router.push(fallbackHref);
+      if (canGoBack) router.back();
+      else router.push(fallbackHref);
     },
-    [backHref, fallbackHref, router]
+    [fallbackHref, router]
   );
 
   return (
@@ -68,42 +49,39 @@ export function BackHeader({
       role="banner"
     >
       <div className="mx-auto w-full max-w-7xl">
-        <div className="relative flex h-14 items-center justify-between">
-          {/* Botão de voltar */}
+        {/* Linha do header */}
+        <div className="relative flex h-14 items-center justify-center overflow-visible">
+          {/* Botão de voltar realmente grudado */}
           <Button
-            size="icon"
+            // NÃO usar size="icon" para não centralizar o ícone
             variant="ghost"
-            className="rounded-xl hover:bg-accent/60 focus-visible:ring-2 focus-visible:ring-ring"
-            aria-label="Voltar"
             onClick={handleBack}
-          >
-            {/* Usa <Link> apenas se houver backHref explícito (melhor para SEO/hover) */}
-            {backHref ? (
-              <Link
-                href={backHref}
-                aria-label="Voltar"
-                className="flex h-6 w-6 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
-                onClick={(e) => {
-                  e.preventDefault();
-                  handleBack(e);
-                }}
-              >
-                <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-              </Link>
-            ) : (
-              <ArrowLeft className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+            aria-label="Voltar"
+            className={cn(
+              "absolute left-0 top-0 h-14 w-12 px-0", // área clicável 48px
+              "rounded-none justify-start",            // ícone encostado
+              "hover:bg-accent/60 focus-visible:ring-2 focus-visible:ring-ring"
             )}
+            // respeita notch/SAFE-AREA do iOS
+            style={{ paddingLeft: "max(env(safe-area-inset-left), 0px)" }}
+          >
+            <ArrowLeft className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
           </Button>
 
-          {/* Título central com truncamento elegante */}
+          {/* Título central (opcional) */}
           {title ? (
-            <h1 className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 select-none text-base font-semibold tracking-tight text-foreground sm:text-lg">
+            <h1 className="pointer-events-none select-none text-base font-semibold tracking-tight text-foreground sm:text-lg">
               <span className="line-clamp-1">{title}</span>
             </h1>
           ) : null}
 
-          {/* Ações à direita */}
-          <div className="flex items-center gap-2">{rightSlot}</div>
+          {/* Ações à direita, espelhadas com safe area */}
+          <div
+            className="absolute right-0 top-0 flex h-14 items-center gap-2 pr-0"
+            style={{ paddingRight: "max(env(safe-area-inset-right), 0px)" }}
+          >
+            {rightSlot}
+          </div>
         </div>
       </div>
     </header>
