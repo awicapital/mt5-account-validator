@@ -7,6 +7,8 @@ import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 
 interface BackHeaderProps {
+  backHref?: string;          // (compat) se informado, sempre navega para esse href
+  backLabel?: string;         // (compat) ignorado visualmente; usamos só o ícone
   fallbackHref?: string;      // fallback quando não houver histórico (padrão: /dashboard)
   title?: string;
   rightSlot?: ReactNode;      // ícones/botões no canto direito
@@ -16,6 +18,8 @@ interface BackHeaderProps {
 }
 
 export function BackHeader({
+  backHref,
+  backLabel, // mantido apenas por compatibilidade
   fallbackHref = "/dashboard",
   title,
   rightSlot,
@@ -28,13 +32,20 @@ export function BackHeader({
   const handleBack = useCallback(
     (e?: MouseEvent) => {
       e?.preventDefault();
+
+      // compat: se o dev passou backHref, priorizamos ele
+      if (backHref) {
+        router.push(backHref);
+        return;
+      }
+
       const canGoBack =
         typeof window !== "undefined" && window.history.length > 1;
 
       if (canGoBack) router.back();
       else router.push(fallbackHref);
     },
-    [fallbackHref, router]
+    [backHref, fallbackHref, router]
   );
 
   return (
@@ -51,18 +62,17 @@ export function BackHeader({
       <div className="mx-auto w-full max-w-7xl">
         {/* Linha do header */}
         <div className="relative flex h-14 items-center justify-center overflow-visible">
-          {/* Botão de voltar realmente grudado */}
+          {/* Botão de voltar colado na borda (respeita safe area) */}
           <Button
-            // NÃO usar size="icon" para não centralizar o ícone
+            // não usar size="icon" para não centralizar o ícone
             variant="ghost"
             onClick={handleBack}
-            aria-label="Voltar"
+            aria-label={backLabel ?? "Voltar"}
             className={cn(
-              "absolute left-0 top-0 h-14 w-12 px-0", // área clicável 48px
-              "rounded-none justify-start",            // ícone encostado
+              "absolute left-0 top-0 h-14 w-12 px-0",
+              "rounded-none justify-start",
               "hover:bg-accent/60 focus-visible:ring-2 focus-visible:ring-ring"
             )}
-            // respeita notch/SAFE-AREA do iOS
             style={{ paddingLeft: "max(env(safe-area-inset-left), 0px)" }}
           >
             <ArrowLeft className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
@@ -75,7 +85,7 @@ export function BackHeader({
             </h1>
           ) : null}
 
-          {/* Ações à direita, espelhadas com safe area */}
+          {/* Ações à direita (espelha safe area) */}
           <div
             className="absolute right-0 top-0 flex h-14 items-center gap-2 pr-0"
             style={{ paddingRight: "max(env(safe-area-inset-right), 0px)" }}
