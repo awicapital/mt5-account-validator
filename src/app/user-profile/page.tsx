@@ -65,8 +65,10 @@ export default function UserProfilePage() {
     }
 
     const { data, error } = await supabase
-      .from("users") // ✅ sem genéricos
-      .select("id, full_name, phone_number, access_level, access_expires_at, avatar_url") // ✅ sem "*"
+      .from("users") // sem genéricos
+      .select(
+        "id, full_name, phone_number, access_level, access_expires_at, avatar_url"
+      ) // sem "*"
       .eq("id", auth.user.id)
       .single();
 
@@ -76,7 +78,8 @@ export default function UserProfilePage() {
       return;
     }
 
-    setUser({ ...data, email: auth.user.email });
+    // converte undefined para null no email
+    setUser({ ...data, email: auth.user.email ?? null });
     setLoading(false);
   }, [router]);
 
@@ -107,7 +110,6 @@ export default function UserProfilePage() {
     const updates =
       editField === "name" ? { full_name: value } : { phone_number: value };
 
-    // Otimista
     const prev = user;
     setUser({ ...user, ...updates });
 
