@@ -11,6 +11,7 @@ import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { AccountCard } from "@/components/ui/account-card";
 import { fetchAccountsData } from "@/lib/accountsData";
+import { BackHeader } from "@/components/ui/back-header";
 import { Pill } from "@/components/ui/pill";
 
 interface Account {
@@ -135,8 +136,8 @@ export default function AccountsPage() {
   const filtered = useMemo(() => {
     const q = query.trim();
     if (!q) return accounts;
-    return accounts.filter((a) =>
-      a.account_number.includes(q) || (a.ea_name ?? "").toLowerCase().includes(q.toLowerCase())
+    return accounts.filter(
+      (a) => a.account_number.includes(q) || (a.ea_name ?? "").toLowerCase().includes(q.toLowerCase())
     );
   }, [accounts, query]);
 
@@ -147,10 +148,7 @@ export default function AccountsPage() {
       return;
     }
 
-    const { data: accRows, error } = await supabase
-      .from("accounts")
-      .select("*")
-      .eq("email", user.user.email);
+    const { data: accRows, error } = await supabase.from("accounts").select("*").eq("email", user.user.email);
 
     if (error) {
       toast.error("Erro ao carregar contas");
@@ -264,28 +262,36 @@ export default function AccountsPage() {
   }
 
   return (
-    <div className="min-h-dvh bg-[#03182f] pb-28">
-{/* Header */}
-<div className="sticky top-0 z-40 bg-[#03182f]/80 backdrop-blur">
-  <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3 text-white">
-    <div className="flex items-center gap-2">
-      <Pill dotColor="bg-[#268bff]">Contas</Pill>
+    <div className="min-h-dvh bg-[#03182f] pb-28 text-white">
+      {/* Header fixo */}
+      <div className="sticky top-0 z-40 bg-[#03182f]/80 backdrop-blur">
+        <div className="mx-auto max-w-5xl">
+          <BackHeader
+  backHref="/"
+  backLabel="Voltar"
+  className="bg-transparent border-b border-white/10 text-white"
+  rightSlot={
+    <div className="relative hidden sm:block">
+      <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-white/40" />
+      <input
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="Buscar por número ou EA"
+        className="w-[220px] rounded-lg border border-white/10 bg-white/5 pl-8 pr-2 py-1.5 text-xs text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/30"
+      />
     </div>
-    <div className="flex items-center gap-2">
-      <div className="relative hidden sm:block">
-        <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-white/40" />
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Buscar por número ou EA"
-          className="w-[220px] rounded-lg border border-white/10 bg-white/5 pl-8 pr-2 py-1.5 text-xs text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/30"
-        />
-      </div>
-    </div>
-  </div>
-</div>
+  }
+/>
 
-      <main className="mx-auto max-w-5xl space-y-6 px-4 pt-4">
+
+          {/* Pill imediatamente abaixo do BackHeader */}
+          <div className="py-2">
+            <Pill dotColor="bg-[#268bff]">Contas</Pill>
+          </div>
+        </div>
+      </div>
+
+      <main className="mx-auto max-w-5xl space-y-6 pt-4">
         {!accounts.length ? (
           <div className="mt-10 text-center text-sm text-white/60">Nenhuma conta cadastrada.</div>
         ) : (
@@ -350,7 +356,11 @@ export default function AccountsPage() {
             />
           </div>
           <DialogFooter className="mt-6 flex justify-center">
-            <Button className="w-full bg-[#268bff] text-white hover:bg-[#1e78e0]" onClick={handleRequest} disabled={submitting}>
+            <Button
+              className="w-full bg-[#268bff] text-white hover:bg-[#1e78e0]"
+              onClick={handleRequest}
+              disabled={submitting}
+            >
               <Plus className="mr-2 h-4 w-4" /> {submitting ? "Enviando..." : "Enviar Solicitação"}
             </Button>
           </DialogFooter>
