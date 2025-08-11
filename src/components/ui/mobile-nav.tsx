@@ -6,6 +6,9 @@ import { useMemo } from "react";
 import clsx from "clsx";
 import { motion, AnimatePresence } from "framer-motion";
 import { Home, List, Bot, GraduationCap, User, Plus } from "lucide-react";
+import type * as React from "react";
+
+const ACTIVE = "#268bff";
 
 export type NavItem = {
   label: string;
@@ -16,10 +19,10 @@ export type NavItem = {
 };
 
 const DEFAULT_ITEMS: NavItem[] = [
-  { label: "Início", href: "/dashboard", icon: Home },
+  { label: "Inicio", href: "/dashboard", icon: Home },
   { label: "Contas", href: "/accounts", icon: List },
   { label: "IA", href: "/agents", icon: Bot },
-  { label: "Cursos", href: "/courses", icon: GraduationCap },
+  { label: "Educacional", href: "/courses", icon: GraduationCap },
   { label: "Perfil", href: "/user-profile", icon: User },
 ];
 
@@ -76,7 +79,7 @@ export default function MobileNav({
         <ul
           role="tablist"
           aria-label="Navegação principal"
-          className={clsx("grid grid-cols-5 items-stretch", "h-16 px-3")}
+          className={clsx("grid grid-cols-5 items-stretch", "h-16 px-2 sm:px-3")}
         >
           {items.map((item, index) => (
             <li key={item.href} role="presentation" className="relative">
@@ -86,18 +89,6 @@ export default function MobileNav({
                 aria-posinset={index + 1}
                 aria-setsize={items.length}
               />
-              <AnimatePresence>
-                {index === activeIndex && (
-                  <motion.span
-                    layoutId="active-underline"
-                    className="pointer-events-none absolute left-1/2 -translate-x-1/2 w-8 -top-px h-[3px] rounded-full bg-[#268bff]"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.3 }}
-                  />
-                )}
-              </AnimatePresence>
             </li>
           ))}
         </ul>
@@ -127,7 +118,7 @@ export default function MobileNav({
   );
 }
 
-/** ---- NavLink: não exige `href` no uso ---- */
+/** ---- NavLink ---- */
 type LinkRestProps = Omit<
   React.ComponentPropsWithoutRef<typeof Link>,
   "href" | "className" | "children"
@@ -147,15 +138,15 @@ function NavLink({
       role="tab"
       aria-selected={active}
       className={clsx(
-        "group relative mx-1 my-2 flex h-12 items-center justify-center gap-1",
-        "rounded-xl text-[11px] leading-none",
-        active ? "text-[#268bff]" : "text-white/80",
+        "group relative mx-1 my-1.5 flex h-[56px] flex-col items-center justify-center gap-0.5",
+        "rounded-xl text-[11px] leading-tight",
+        active ? `text-[${ACTIVE}]` : "text-white/80",
         "focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40",
         className
       )}
       {...rest}
     >
-      <span className="relative grid h-8 w-8 place-items-center rounded-xl">
+      <span className="relative grid h-7 w-7 place-items-center rounded-xl">
         <Icon
           className={clsx(
             "transition-transform duration-300",
@@ -180,9 +171,7 @@ function NavLink({
         </AnimatePresence>
       </span>
 
-      <span className={clsx("ml-2 hidden sm:inline", active ? "font-medium" : "font-normal")}>
-        {item.label}
-      </span>
+      <span className={clsx(active ? "font-medium" : "font-normal")}>{item.label}</span>
     </Link>
   );
 }

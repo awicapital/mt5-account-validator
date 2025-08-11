@@ -79,7 +79,7 @@ function SwipeableAccountCard({ account, onDelete, onOpen }: SwipeableAccountCar
       <motion.div
         aria-hidden
         style={{ opacity: revealDelete }}
-        className="absolute inset-0 z-0 grid place-items-center rounded-xl bg-red-900/70"
+        className="absolute inset-0 z-0 grid place-items-center rounded-2xl bg-red-900/70"
       >
         <div className="flex items-center gap-2 text-sm text-red-200">
           <Trash2 className="h-4 w-4" /> Deslize para excluir
@@ -88,18 +88,16 @@ function SwipeableAccountCard({ account, onDelete, onOpen }: SwipeableAccountCar
 
       <motion.div
         {...swipeHandlers}
-        onClick={() => {
-          if (account.is_active) onOpen();
-        }}
+        onClick={() => account.is_active && onOpen()}
         onKeyDown={handleKeyDown}
         role="button"
         tabIndex={0}
         whileTap={{ scale: 0.99 }}
         animate={controls}
         style={{ x, backgroundColor: bgColor }}
-        className={`relative z-10 overflow-hidden rounded-xl border border-white/10 cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#268bff]/60 focus:ring-offset-[#03182f] ${
-          account.is_active ? "" : "bg-yellow-500/20 border-yellow-400"
-        }`}
+        className={`relative z-10 overflow-hidden rounded-2xl cursor-pointer
+          focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#268bff]/60 focus:ring-offset-[#03182f]
+          ${account.is_active ? "border-0 bg-transparent" : "border border-yellow-400 bg-yellow-500/20"}`}
         aria-label={
           account.is_active
             ? `Abrir detalhes da conta ${account.account_number}`
@@ -107,7 +105,7 @@ function SwipeableAccountCard({ account, onDelete, onOpen }: SwipeableAccountCar
         }
       >
         {account.is_active ? (
-          <AccountCard account={account} className="bg-[#1e2b45]" />
+          <AccountCard account={account} className="rounded-2xl" />
         ) : (
           <div className="flex h-20 flex-col items-center justify-center gap-1 text-sm font-medium text-yellow-300">
             <span>Pendente de aprovação</span>
