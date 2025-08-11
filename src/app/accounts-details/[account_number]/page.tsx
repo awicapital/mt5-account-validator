@@ -27,6 +27,16 @@ type Trade = {
   profit: number
 }
 
+type HistoryTrade = {
+  id: string
+  date: string
+  type: string
+  profit: number
+  accountId: string
+  symbol: string
+  volume: number
+}
+
 export default function AccountDetailsPage() {
   const { account_number } = useParams<{ account_number: string }>()
   const accountNumber = Number(account_number)
@@ -54,11 +64,13 @@ export default function AccountDetailsPage() {
         const lm = res.headers.get('last-modified')
         if (lm) setLastUpdated(new Date(lm).toISOString())
 
-        const arr = (await res.json()) as Trade[] | unknown
+        const arr = (await res.json()) as unknown
         if (!Array.isArray(arr)) throw new Error('Formato inesperado do JSON.')
         setRawTrades(arr as Trade[])
-      } catch (e: any) {
-        setError(e?.message ?? 'Erro ao carregar dados')
+      } catch (e: unknown) {
+        const message =
+          e instanceof Error ? e.message : typeof e === 'string' ? e : 'Erro ao carregar dados'
+        setError(message)
       } finally {
         setLoading(false)
       }
@@ -215,12 +227,12 @@ export default function AccountDetailsPage() {
         </div>
 
         {lastUpdated && (
-          <p className="  mt-1 text-xs text-white/60">
+          <p className="mt-1 text-xs text-white/60">
             Last update: {new Date(lastUpdated).toLocaleString('pt-BR')}
           </p>
         )}
 
-        <div className="space-y-6   pt-1">
+        <div className="space-y-6 pt-1">
           <AccountResumeCard
             currentBalance={totals.currentBalance}
             pnlTotal={totals.pnlTotal}
@@ -231,10 +243,15 @@ export default function AccountDetailsPage() {
           <AccountChartCard logs={logs} />
 
           <AccountMetricsCard metrics={metrics} />
-          <AccountSymbolsChart data={perSymbol.map(s => ({
-            symbol: s.symbol, trades: s.trades, volume: s.volume, profit: s.profit
-          }))} />
-          <AccountHistoryCard trades={tradesNoCashflow as any} />
+          <AccountSymbolsChart
+            data={perSymbol.map(s => ({
+              symbol: s.symbol,
+              trades: s.trades,
+              volume: s.volume,
+              profit: s.profit,
+            }))}
+          />
+          <AccountHistoryCard trades={tradesNoCashflow as unknown as HistoryTrade[]} />
         </div>
 
         <div className="fixed right-4 bottom-24 md:bottom-8 z-40">
