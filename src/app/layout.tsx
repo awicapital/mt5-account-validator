@@ -8,10 +8,7 @@ export const metadata: Metadata = {
   description: "Validação de contas MT5 com segurança e performance.",
   viewport: "width=device-width, initial-scale=1, viewport-fit=cover",
   manifest: "/manifest.json",
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "black-translucent",
-  },
+  appleWebApp: { capable: true, statusBarStyle: "black-translucent" },
   icons: {
     icon: [
       { url: "/icons/icon-192x192.png", sizes: "192x192", type: "image/png" },
@@ -20,14 +17,11 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-BR" className="dark">
-      <body className="font-sans bg-background text-foreground antialiased min-h-screen">
+      {/* 100dvh evita bugs de 100vh no mobile */}
+      <body className="min-h-[100dvh] bg-background text-foreground antialiased">
         <AuthProvider>
           <LayoutWrapper>{children}</LayoutWrapper>
         </AuthProvider>

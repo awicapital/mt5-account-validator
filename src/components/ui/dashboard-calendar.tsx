@@ -6,6 +6,7 @@ import "dayjs/locale/pt-br";
 import { useMemo, useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence, PanInfo, Variants } from "framer-motion";
 import { Trade } from "@/lib/accountsData";
+import { Pill } from "@/components/ui/pill";
 
 dayjs.locale("pt-br");
 
@@ -195,20 +196,21 @@ export function DashboardCalendar({
     <div className="w-full">
       <div className="rounded-xl py-4 bg-[#03182f] text-white max-w-6xl mx-auto px-0 relative">
         {/* Header */}
-        <div className="flex items-start justify-between mb-4">
-          <div className="text-sm font-semibold">Calendário</div>
-          <div className="flex flex-col items-end">
-            <button
-              onClick={() => setShowMonthPicker((v) => !v)}
-              className="text-sm font-medium text-white hover:underline"
-            >
-              {currentMonth.format("MM/YY")}
-            </button>
-            <span className={`text-xs mt-1 font-medium ${totalColor}`}> 
-              Resultado: {formatPnl(monthTotal)}
-            </span>
-          </div>
-        </div>
+<div className="flex items-center justify-between mb-4">
+  <Pill>Calendário</Pill>
+
+  <div className="flex flex-col items-end">
+    <button
+      onClick={() => setShowMonthPicker((v) => !v)}
+      className="text-sm font-medium text-white hover:underline"
+    >
+      {currentMonth.format("MM/YY")}
+    </button>
+    <span className={`text-xs mt-1 font-medium ${totalColor}`}>
+      Resultado: {formatPnl(monthTotal)}
+    </span>
+  </div>
+</div>
 
         {/* Month Picker */}
         {showMonthPicker && (

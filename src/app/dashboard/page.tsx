@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, RefreshCw, CalendarDays } from "lucide-react";
+import { Loader2, CalendarDays } from "lucide-react";
 import dayjs from "dayjs";
 import "dayjs/locale/pt-br";
 
@@ -33,12 +33,10 @@ export default function DashboardMPage() {
   const [monthlyGrowthPositive, setMonthlyGrowthPositive] = useState<boolean>(true);
   const [hasAccountData, setHasAccountData] = useState<boolean>(false);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
   const fetchDashboardData = useCallback(async () => {
     try {
-      setRefreshing(true);
       const { data: session } = await supabase.auth.getUser();
       const email = session?.user?.email;
       if (!email) {
@@ -66,7 +64,6 @@ export default function DashboardMPage() {
 
       const accountsData = await fetchAccountsData();
       if (accountsData) {
-        // dailyPnls
         const parsedDaily: DailyPnL[] = Object.entries(accountsData.dailyPnls).map(([date, pnl]) => ({
           date: date.replaceAll(".", "-"),
           pnl: typeof pnl === "number" ? pnl : 0,
@@ -74,12 +71,10 @@ export default function DashboardMPage() {
         setDailyPnls(parsedDaily);
         setAllTrades(accountsData.trades);
 
-        // balance (exclui depósitos do PnL)
         const nonDeposits = accountsData.trades.filter((t) => t.type !== "deposit");
         const totalPnL = nonDeposits.reduce((sum, t) => sum + t.profit, 0);
         setBalance(accountsData.totalDeposits + totalPnL);
 
-        // crescimento mensal
         const now = new Date();
         const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
         const pnlThisMonth = nonDeposits
@@ -94,7 +89,6 @@ export default function DashboardMPage() {
       }
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
   }, [router]);
 
@@ -102,7 +96,6 @@ export default function DashboardMPage() {
     fetchDashboardData();
   }, [fetchDashboardData]);
 
-  // Agrupa trades do dia selecionado por conta (EXCLUINDO depósitos)
   const tradesByAccount = useMemo(() => {
     if (!selectedDay) return {} as Record<string, Trade[]>;
     const map: Record<string, Trade[]> = {};
@@ -113,14 +106,6 @@ export default function DashboardMPage() {
       });
     return map;
   }, [allTrades, selectedDay]);
-
-  const selectedDateLabel = useMemo(() => {
-    if (!selectedDay) return null;
-    const d = dayjs(selectedDay);
-    const w = d.format("dddd");
-    const weekdayCap = w.charAt(0).toUpperCase() + w.slice(1);
-    return `${weekdayCap}, ${d.format("D [de] MMMM [de] YYYY")}`;
-  }, [selectedDay]);
 
   if (loading) {
     return (
@@ -142,29 +127,7 @@ export default function DashboardMPage() {
 
   return (
     <div className="min-h-[100dvh] bg-[#03182f] pb-[calc(84px+env(safe-area-inset-bottom))] text-white">
-      {/* Header compacto com ação de atualizar */}
-      <div className="sticky top-0 z-40 border-b border-white/10 bg-[#03182f]/80 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-          <div className="flex items-center gap-3 text-sm">
-            <CalendarDays className="h-4 w-4 text-white/70" />
-            {selectedDateLabel ? (
-              <span className="text-white/80">{selectedDateLabel}</span>
-            ) : (
-              <span className="text-white/60">Selecione um dia no calendário</span>
-            )}
-          </div>
-          <button
-            onClick={fetchDashboardData}
-            className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/80 transition hover:bg-white/10"
-            aria-label="Atualizar dados"
-          >
-            <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-            Atualizar
-          </button>
-        </div>
-      </div>
-
-      <main className="mx-auto max-w-6xl space-y-6 px-4 pt-4 lg:px-8">
+      <main className="mx-auto max-w-6xl space-y-6 pt-4 lg:px-8">
         {/* Card principal de PnL */}
         <div className="relative z-30">
           <DashboardPnLCard
@@ -194,7 +157,6 @@ export default function DashboardMPage() {
                     key={accountId}
                     className="rounded-2xl border border-blue-600/30 bg-[#0f1b2e]/80 p-4 shadow-lg backdrop-blur-sm"
                   >
-                    {/* Cabeçalho */}
                     <div className="mb-3 flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium">Conta {accountId}</span>
@@ -206,13 +168,10 @@ export default function DashboardMPage() {
                         className={`text-sm font-medium ${
                           sum > 0 ? "text-emerald-400" : sum < 0 ? "text-rose-400" : "text-white/80"
                         }`}
-                        title="Resultado do dia nesta conta"
                       >
                         {sum.toLocaleString("pt-BR", { style: "currency", currency: "USD" })}
                       </div>
                     </div>
-
-                    {/* Lista */}
                     <div className="divide-y divide-[#334155]">
                       <div className="grid grid-cols-5 gap-2 pb-2 text-[11px] text-white/50">
                         <span>Hora</span>

@@ -6,11 +6,12 @@ import { useSwipeable } from "react-swipeable";
 import { motion, useAnimation, useMotionValue, useTransform } from "framer-motion";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Loader2, Trash2, Plus, RefreshCcw, Search } from "lucide-react";
+import { Loader2, Trash2, Plus, Search } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { AccountCard } from "@/components/ui/account-card";
 import { fetchAccountsData } from "@/lib/accountsData";
+import { Pill } from "@/components/ui/pill";
 
 interface Account {
   id: string;
@@ -44,7 +45,6 @@ function SwipeableAccountCard({ account, onDelete, onOpen }: SwipeableAccountCar
       if (e.deltaX > 0) x.set(0);
     },
     onSwipedLeft: async (e) => {
-      // se arrastar o suficiente, deleta
       if (e.deltaX < -90) {
         await controls.start({ x: -160, opacity: 0, transition: { duration: 0.18 } });
         onDelete();
@@ -122,7 +122,6 @@ export default function AccountsPage() {
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [query, setQuery] = useState("");
 
@@ -142,7 +141,6 @@ export default function AccountsPage() {
   }, [accounts, query]);
 
   const fetchAccounts = useCallback(async () => {
-    setRefreshing(true);
     const { data: user } = await supabase.auth.getUser();
     if (!user?.user?.email) {
       router.push("/login");
@@ -158,7 +156,6 @@ export default function AccountsPage() {
       toast.error("Erro ao carregar contas");
       setAccounts([]);
       setLoading(false);
-      setRefreshing(false);
       return;
     }
 
@@ -173,7 +170,6 @@ export default function AccountsPage() {
         }))
       );
       setLoading(false);
-      setRefreshing(false);
       return;
     }
 
@@ -203,7 +199,6 @@ export default function AccountsPage() {
 
     setAccounts(enhanced);
     setLoading(false);
-    setRefreshing(false);
   }, [router]);
 
   useEffect(() => {
@@ -228,7 +223,6 @@ export default function AccountsPage() {
       toast.success("Conta excluída com sucesso!");
     } catch (err) {
       toast.error("Erro ao excluir conta");
-      // revert
       await fetchAccounts();
     }
   }
@@ -271,35 +265,25 @@ export default function AccountsPage() {
 
   return (
     <div className="min-h-dvh bg-[#03182f] pb-28">
-      {/* Header */}
-      <div className="sticky top-0 z-40 border-b border-white/10 bg-[#03182f]/80 backdrop-blur">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3 text-white">
-          <div className="flex items-center gap-2">
-            <h1 className="text-sm font-semibold">Minhas Contas</h1>
-            <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-white/70">
-              {accounts.length} itens
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="relative hidden sm:block">
-              <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-white/40" />
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Buscar por número ou EA"
-                className="w-[220px] rounded-lg border border-white/10 bg-white/5 pl-8 pr-2 py-1.5 text-xs text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/30"
-              />
-            </div>
-            <Button
-              variant="secondary"
-              className="rounded-lg border-white/15 bg-white/10 text-white hover:bg-white/20"
-              onClick={fetchAccounts}
-            >
-              <RefreshCcw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} /> Atualizar
-            </Button>
-          </div>
-        </div>
+{/* Header */}
+<div className="sticky top-0 z-40 bg-[#03182f]/80 backdrop-blur">
+  <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3 text-white">
+    <div className="flex items-center gap-2">
+      <Pill dotColor="bg-[#268bff]">Contas</Pill>
+    </div>
+    <div className="flex items-center gap-2">
+      <div className="relative hidden sm:block">
+        <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-white/40" />
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Buscar por número ou EA"
+          className="w-[220px] rounded-lg border border-white/10 bg-white/5 pl-8 pr-2 py-1.5 text-xs text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/30"
+        />
       </div>
+    </div>
+  </div>
+</div>
 
       <main className="mx-auto max-w-5xl space-y-6 px-4 pt-4">
         {!accounts.length ? (

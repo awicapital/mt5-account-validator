@@ -1,7 +1,8 @@
 'use client'
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { DollarSign, TrendingUp, ArrowDownCircle, ArrowUpCircle } from 'lucide-react'
+import { Pill } from '@/components/ui/pill'
 
 interface Props {
   currentBalance?: number
@@ -29,7 +30,7 @@ export function AccountResumeCard({
   return (
     <Card className="bg-[#0f1d31] border border-[#1e2c46] shadow-md rounded-2xl">
       <CardHeader className="px-6 py-4 pb-2">
-        <CardTitle className="text-white text-base font-semibold">Resumo</CardTitle>
+        <Pill dotColor="bg-sky-400">Resumo</Pill>
       </CardHeader>
       <CardContent className="grid grid-cols-2 gap-6 px-6 pb-5">
         <Item
