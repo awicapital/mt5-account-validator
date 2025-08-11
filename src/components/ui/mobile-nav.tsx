@@ -5,14 +5,7 @@ import { usePathname } from "next/navigation";
 import { useMemo } from "react";
 import clsx from "clsx";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  Home,
-  List,
-  Bot,
-  GraduationCap,
-  User,
-  Plus,
-} from "lucide-react";
+import { Home, List, Bot, GraduationCap, User, Plus } from "lucide-react";
 
 export type NavItem = {
   label: string;
@@ -48,7 +41,9 @@ export default function MobileNav({
   const pathname = usePathname();
 
   const activeIndex = useMemo(() => {
-    const idx = items.findIndex((it) => pathname === it.href || pathname.startsWith(`${it.href}/`));
+    const idx = items.findIndex(
+      (it) => pathname === it.href || pathname.startsWith(`${it.href}/`)
+    );
     return idx === -1 ? 0 : idx;
   }, [items, pathname]);
 
@@ -81,7 +76,7 @@ export default function MobileNav({
         <ul
           role="tablist"
           aria-label="Navegação principal"
-          className={clsx("grid grid-cols-5 items-stretch","h-16 px-3")}
+          className={clsx("grid grid-cols-5 items-stretch", "h-16 px-3")}
         >
           {items.map((item, index) => (
             <li key={item.href} role="presentation" className="relative">
@@ -132,16 +127,19 @@ export default function MobileNav({
   );
 }
 
+/** ---- NavLink: não exige `href` no uso ---- */
+type LinkRestProps = Omit<
+  React.ComponentPropsWithoutRef<typeof Link>,
+  "href" | "className" | "children"
+>;
+
 function NavLink({
   item,
   active,
-  ...aria
-}: {
-  item: NavItem;
-  active: boolean;
-} & React.ComponentPropsWithoutRef<typeof Link>) {
+  className,
+  ...rest
+}: { item: NavItem; active: boolean; className?: string } & LinkRestProps) {
   const Icon = item.icon;
-
   return (
     <Link
       href={item.href}
@@ -152,12 +150,19 @@ function NavLink({
         "group relative mx-1 my-2 flex h-12 items-center justify-center gap-1",
         "rounded-xl text-[11px] leading-none",
         active ? "text-[#268bff]" : "text-white/80",
-        "focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+        "focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40",
+        className
       )}
-      {...aria}
+      {...rest}
     >
       <span className="relative grid h-8 w-8 place-items-center rounded-xl">
-        <Icon className={clsx("transition-transform duration-300", active ? "scale-110" : "scale-100")} size={18} />
+        <Icon
+          className={clsx(
+            "transition-transform duration-300",
+            active ? "scale-110" : "scale-100"
+          )}
+          size={18}
+        />
         <AnimatePresence>
           {!!item.badge && item.badge > 0 && (
             <motion.span
@@ -175,7 +180,9 @@ function NavLink({
         </AnimatePresence>
       </span>
 
-      <span className={clsx("ml-2 hidden sm:inline", active ? "font-medium" : "font-normal")}>{item.label}</span>
+      <span className={clsx("ml-2 hidden sm:inline", active ? "font-medium" : "font-normal")}>
+        {item.label}
+      </span>
     </Link>
   );
 }
