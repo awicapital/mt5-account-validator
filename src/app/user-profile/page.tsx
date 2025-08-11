@@ -65,9 +65,8 @@ export default function UserProfilePage() {
     }
 
     const { data, error } = await supabase
-      // ✅ corrigido: dois genéricos quando o cliente não é tipado
-      .from<UserProfile, UserProfile>("users")
-      .select("*")
+      .from("users") // ✅ sem genéricos
+      .select("id, full_name, phone_number, access_level, access_expires_at, avatar_url") // ✅ sem "*"
       .eq("id", auth.user.id)
       .single();
 
@@ -173,7 +172,8 @@ export default function UserProfilePage() {
       toast.success("Avatar atualizado!");
       setUser({ ...user, avatar_url: pub.publicUrl });
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Erro ao enviar imagem";
+      const message =
+        err instanceof Error ? err.message : "Erro ao enviar imagem";
       toast.error(message);
     } finally {
       setUploading(false);
@@ -190,7 +190,8 @@ export default function UserProfilePage() {
     );
   }
 
-  const accessColor = user.access_level === "pro" ? "text-emerald-400" : "text-sky-400";
+  const accessColor =
+    user.access_level === "pro" ? "text-emerald-400" : "text-sky-400";
 
   return (
     <div className="min-h-dvh bg-[#03182f] pb-28">
@@ -220,7 +221,11 @@ export default function UserProfilePage() {
               >
                 {user.avatar_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={user.avatar_url} alt="Avatar" className="h-full w-full rounded-full object-cover" />
+                  <img
+                    src={user.avatar_url}
+                    alt="Avatar"
+                    className="h-full w-full rounded-full object-cover"
+                  />
                 ) : (
                   initials(user.full_name)
                 )}
@@ -245,14 +250,21 @@ export default function UserProfilePage() {
                 <div className="text-base font-medium">
                   {user.full_name || "Usuário sem nome"}
                 </div>
-                <span className={`rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] ${accessColor}`}>
+                <span
+                  className={`rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] ${accessColor}`}
+                >
                   <ShieldCheck className="mr-1 inline h-3.5 w-3.5" />
                   {user.access_level || "free"}
                 </span>
               </div>
               <div className="text-xs text-white/70">
                 <CalendarClock className="mr-1 inline h-3.5 w-3.5" />
-                Expira em {user.access_expires_at ? dayjs(user.access_expires_at).format("D [de] MMMM [de] YYYY") : "—"}
+                Expira em{" "}
+                {user.access_expires_at
+                  ? dayjs(user.access_expires_at).format(
+                      "D [de] MMMM [de] YYYY"
+                    )
+                  : "—"}
               </div>
               <div className="text-[11px] text-white/50">
                 <BadgeCheck className="mr-1 inline h-3.5 w-3.5" />
@@ -285,13 +297,20 @@ export default function UserProfilePage() {
           <div className="flex items-center justify-between border-t border-[#1f2c44] px-4 py-4 text-white">
             <div className="flex min-w-0 items-center gap-3">
               <Mail className="h-5 w-5 shrink-0" />
-              <span className="truncate text-sm font-medium">{user.email || "Sem e-mail"}</span>
+              <span className="truncate text-sm font-medium">
+                {user.email || "Sem e-mail"}
+              </span>
             </div>
             <Button
               size="sm"
               variant="secondary"
               className="rounded-lg border-white/15 bg-white/10 text-white hover:bg-white/20"
-              onClick={() => user.email && navigator.clipboard.writeText(user.email).then(() => toast.success("E-mail copiado!"))}
+              onClick={() =>
+                user.email &&
+                navigator.clipboard
+                  .writeText(user.email)
+                  .then(() => toast.success("E-mail copiado!"))
+              }
             >
               <Copy className="mr-1.5 h-3.5 w-3.5" /> Copiar
             </Button>
@@ -308,7 +327,9 @@ export default function UserProfilePage() {
               <div className="flex items-center gap-3">
                 <Phone className="h-5 w-5" />
                 <span className="text-sm font-medium">
-                  {user.phone_number ? maskPhone(user.phone_number) : "Sem telefone"}
+                  {user.phone_number
+                    ? maskPhone(user.phone_number)
+                    : "Sem telefone"}
                 </span>
               </div>
               <ChevronRight className="h-4 w-4 text-white/40" />
@@ -339,7 +360,10 @@ export default function UserProfilePage() {
             Você será redirecionado para a tela de login.
           </p>
           <DialogFooter className="flex justify-center">
-            <Button className="rounded-xl bg-red-600 text-white hover:bg-red-700" onClick={handleLogout}>
+            <Button
+              className="rounded-xl bg-red-600 text-white hover:bg-red-700"
+              onClick={handleLogout}
+            >
               <LogOut className="mr-2 h-4 w-4" /> Sair
             </Button>
           </DialogFooter>
@@ -365,12 +389,25 @@ export default function UserProfilePage() {
             <input
               type="text"
               value={newValue}
-              onChange={(e) => setNewValue(editField === "phone" ? maskPhone(e.target.value) : e.target.value)}
-              placeholder={editField === "name" ? "Digite seu nome" : "Digite seu telefone"}
+              onChange={(e) =>
+                setNewValue(
+                  editField === "phone"
+                    ? maskPhone(e.target.value)
+                    : e.target.value
+                )
+              }
+              placeholder={
+                editField === "name"
+                  ? "Digite seu nome"
+                  : "Digite seu telefone"
+              }
               className="w-full rounded-md border border-[#2c3a55] bg-[#1f2c44] px-3 py-2 text-white placeholder:text-white/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#268bff]"
             />
             <DialogFooter>
-              <Button className="w-full rounded-xl bg-[#268bff] text-white hover:bg-[#1e78e0]" onClick={updateField}>
+              <Button
+                className="w-full rounded-xl bg-[#268bff] text-white hover:bg-[#1e78e0]"
+                onClick={updateField}
+              >
                 Salvar alterações
               </Button>
             </DialogFooter>
