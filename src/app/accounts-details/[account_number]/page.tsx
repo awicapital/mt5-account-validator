@@ -2,9 +2,10 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { Loader2, ArrowLeft, Sparkles } from 'lucide-react'
+import { Loader2, Sparkles } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
+import { BackHeader } from '@/components/ui/back-header'
 import { AccountResumeCard } from '@/components/ui/account-resume-card'
 import { AccountChartCard } from '@/components/ui/account-chart-card'
 import { AccountMetricsCard } from '@/components/ui/account-metrics-card'
@@ -43,8 +44,8 @@ export default function AccountDetailsPage() {
   const accountNumber = Number(account_number)
   const router = useRouter()
 
-  const [logs, setLogs] = useState<Log[]>([]) // lucros acumulados (sem cashflow)
-  const [trades, setTrades] = useState<Trade[]>([]) // somente trades (sem cashflow)
+  const [logs, setLogs] = useState<Log[]>([])
+  const [trades, setTrades] = useState<Trade[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
@@ -115,9 +116,7 @@ export default function AccountDetailsPage() {
     fetchData()
   }, [accountNumber])
 
-  // ----------------------------------------------
-  // ✅ Cálculos e hooks NÃO condicionais (antes dos early returns)
-  // ----------------------------------------------
+  // -------- cálculos --------
   const currentBalance = logs.at(-1)?.pnl || 0
   const pnlTotal = logs.at(-1)?.pnl || 0
 
@@ -205,7 +204,6 @@ export default function AccountDetailsPage() {
     { label: 'Pior Dia', value: worstDay ? `${worstDay[0]} ($${worstDay[1].toFixed(2)})` : '-', hint: 'Maior prejuízo diário.' },
   ]
 
-  // ---------- Estruturas derivadas ----------
   const symbolsStructured = useMemo(() => {
     return Object.values(statsBySymbol)
       .sort((a, b) => Math.abs(b.profit) - Math.abs(a.profit))
@@ -218,9 +216,6 @@ export default function AccountDetailsPage() {
       }))
   }, [statsBySymbol])
 
-  // ----------------------------------------------
-  // Early returns (depois de TODOS os hooks acima)
-  // ----------------------------------------------
   if (loading) {
     return (
       <div className="h-dvh flex items-center justify-center bg-[#03182f]">
@@ -246,7 +241,6 @@ export default function AccountDetailsPage() {
     )
   }
 
-  // ---------- Builder de JSON para copiar ----------
   const buildClipboardJSON = () => {
     const payload = {
       account: {
@@ -285,7 +279,6 @@ export default function AccountDetailsPage() {
     return JSON.stringify(payload, null, 2)
   }
 
-  // Copia para a área de transferência com fallback para mobile/navegadores sem Clipboard API
   const copyMetricsToClipboard = async () => {
     const text = buildClipboardJSON()
 
@@ -293,7 +286,7 @@ export default function AccountDetailsPage() {
       await navigator.clipboard.writeText(text)
       toast.success('Métricas e resumo por ativo copiados!')
       return
-    } catch (err) {
+    } catch {
       try {
         const ta = document.createElement('textarea')
         ta.value = text
@@ -316,26 +309,22 @@ export default function AccountDetailsPage() {
 
   return (
     <TooltipProvider delayDuration={200}>
-      <div className="pt-4 pb-28 bg-[#03182f] min-h-dvh space-y-6">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => router.back()}
-            className="text-white p-2 rounded-full hover:bg-white/10 transition"
-            aria-label="Voltar"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <div className="text-white">
-            <h1 className="text-sm font-semibold">Account #{accountNumber}</h1>
-            {lastUpdated && (
-              <p className="text-xs text-muted-foreground">
-                Last update: {new Date(lastUpdated).toLocaleString('pt-BR')}
-              </p>
-            )}
-          </div>
-        </div>
+      <div className="pb-28 bg-[#03182f] min-h-dvh space-y-6">
+        <BackHeader
+          // mantém colado, texto branco e borda sutil
+          className="bg-transparent border-b border-white/10 text-white"
+          fallbackHref="/dashboard"
+          withBorder
+          title={`Account #${accountNumber}`}
+          // rightSlot opcional (ex.: ações)
+        />
+        {lastUpdated && (
+          <p className="px-4 -mt-3 text-xs text-white/60">
+            Last update: {new Date(lastUpdated).toLocaleString('pt-BR')}
+          </p>
+        )}
 
-        <div className="space-y-6">
+        <div className="space-y-6 px-4 pt-1">
           <AccountResumeCard
             currentBalance={currentBalance}
             pnlTotal={pnlTotal}
@@ -343,7 +332,6 @@ export default function AccountDetailsPage() {
             totalWithdrawals={totalWithdrawals}
           />
 
-          {/* Apenas gráfico de PnL */}
           <AccountChartCard logs={logs} />
 
           <AccountMetricsCard metrics={metrics} />
