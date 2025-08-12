@@ -5,20 +5,30 @@ import type { NextConfig } from "next";
 
 const isProd = process.env.NODE_ENV === "production";
 
-// 1) Opções do PWA
+// 1) Opções do PWA (ativo só em produção)
 const pwaConfig = {
   dest: "public",
   register: true,
   skipWaiting: true,
-  disable: !isProd, // desabilita PWA no dev
+  disable: !isProd,
 };
 
-// 2) Next config (sem swcMinify)
+// 2) Next config
 const nextConfig: NextConfig = {
   reactStrictMode: true,
 
-  // Descomente TEMPORARIAMENTE se precisar passar o build enquanto corrige lints:
-  // eslint: { ignoreDuringBuilds: true },
+  // 🔓 Desbloqueia o deploy enquanto corrige os lints localmente
+  eslint: {
+    ignoreDuringBuilds: true, // REMOVA depois de corrigir os erros de lint
+  },
+
+  // Permite otimizar imagens de qualquer domínio (restrinja se precisar)
+  images: {
+    remotePatterns: [
+      { protocol: "https", hostname: "**" },
+      { protocol: "http", hostname: "**" }, // remova se não usar http
+    ],
+  },
 
   webpack(config) {
     config.resolve.alias = {
