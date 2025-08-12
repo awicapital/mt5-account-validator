@@ -14,6 +14,7 @@ import {
   Tooltip as RTooltip,
   Cell,
 } from 'recharts'
+import type { Payload } from 'recharts' // <<— importante para o labelFormatter
 import { BarChart2 } from 'lucide-react'
 
 export type MonthlyPoint = {
@@ -84,7 +85,7 @@ export function AccountMonthlyCard({
   data,
   computeMoM = true, // calcula variação mês a mês (MoM) a partir do P&L
 }: {
-  data: MonthlyPoint[]
+  data: ReadonlyArray<MonthlyPoint> // <- aceita imutável também aqui
   computeMoM?: boolean
 }) {
   // Normaliza + ordena + calcula MoM (se necessário)
@@ -113,6 +114,7 @@ export function AccountMonthlyCard({
 
     // Calcula MoM para quem não enviou gainPct
     if (computeMoM) {
+      // não mutamos o array de entrada (apenas o objeto clonado/normalizado)
       for (let i = 0; i < normalized.length; i++) {
         const curr = normalized[i]
         // Se já veio do backend, respeitamos.
@@ -216,6 +218,7 @@ export function AccountMonthlyCard({
                   borderRadius: 12,
                 }}
                 labelStyle={{ color: 'rgba(255,255,255,0.9)' }}
+                // manter flexível no terceiro arg para não brigar com tipos internos
                 formatter={(value: any, name: any, { payload }: any) => {
                   if (name === 'pnl')
                     return [
@@ -225,13 +228,17 @@ export function AccountMonthlyCard({
                   if (name === 'gainPct') return [formatPct(Number(value) || 0), 'Variação MoM']
                   return [value, name]
                 }}
-                labelFormatter={(label: string, items: any[]) => {
-                  const p = items?.[0]?.payload as (MonthlyPoint & { trades?: number; winRate?: number; displayMonth?: string }) | undefined
+                // <- assinatura correta: payload readonly
+                labelFormatter={(label: any, payload: ReadonlyArray<Payload<any, any>>) => {
+                  const p =
+                    payload?.[0]?.payload as
+                      | (MonthlyPoint & { trades?: number; winRate?: number; displayMonth?: string })
+                      | undefined
                   const extra =
                     p && (p.trades || p.winRate !== undefined)
                       ? ` · ${p.trades ?? '--'} trades${p.winRate !== undefined ? ` · Win ${Math.round(p.winRate)}%` : ''}`
                       : ''
-                  return `${p?.displayMonth ?? label}${extra}`
+                  return `${p?.displayMonth ?? String(label)}${extra}`
                 }}
               />
               <Bar yAxisId="left" dataKey="pnl" radius={[6, 6, 0, 0]}>
