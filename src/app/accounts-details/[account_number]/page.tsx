@@ -324,61 +324,53 @@ export default function AccountDetailsPage() {
   }
 
   return (
-    <TooltipProvider delayDuration={200}>
-      <div className="pb-28 bg-[#03182f] min-h-dvh space-y-6">
-        <BackHeader
-          className="bg-transparent border-b border-white/10 text-white"
-          fallbackHref="/dashboard"
-          withBorder
-        />
+  <TooltipProvider delayDuration={200}>
+    <div className="pb-28 bg-[#03182f] min-h-dvh space-y-6">
+      <BackHeader
+        className="bg-transparent border-b border-white/10 text-white"
+        fallbackHref="/dashboard"
+        withBorder
+      />
 
-        {/* Pill com número da conta e bolinha verde */}
-        <div className="pt-2">
-          <Pill dotColor="bg-green-500">{accountNumber}</Pill>
-        </div>
+      <div className="space-y-6 pt-1">
+      <AccountResumeCard
+  accountNumber={accountNumber}
+  lastUpdate={lastUpdated ? new Date(lastUpdated) : undefined}
+  currentBalance={totals.currentBalance}
+  pnlTotal={totals.pnlTotal}
+  totalDeposits={totals.deposits}
+  totalWithdrawals={totals.withdrawals}
+/>
 
-        {lastUpdated && (
-          <p className="mt-1 text-xs text-white/60">
-            Last update: {new Date(lastUpdated).toLocaleString('pt-BR')}
-          </p>
-        )}
+        <AccountChartCard logs={logs} />
 
-        <div className="space-y-6 pt-1">
-          <AccountResumeCard
-            currentBalance={totals.currentBalance}
-            pnlTotal={totals.pnlTotal}
-            totalDeposits={totals.deposits}
-            totalWithdrawals={totals.withdrawals}
-          />
+        <AccountMetricsCard metrics={metrics} />
 
-          <AccountChartCard logs={logs} />
+        <AccountSymbolsChart data={symbolChartData} />
 
-          <AccountMetricsCard metrics={metrics} />
-
-          <AccountSymbolsChart data={symbolChartData} />
-
-          <AccountHistoryCard trades={tradesForCard} />
-        </div>
-
-        <div className="fixed right-4 bottom-24 md:bottom-8 z-40">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                size="lg"
-                onClick={copyMetricsToClipboard}
-                className="rounded-full shadow-xl bg-[#1e78e0] text-white hover:bg-[#1663b8] border border-white/20"
-                aria-label="Copiar métricas da conta"
-              >
-                <Sparkles className="h-5 w-5 mr-2" />
-                Copiar métricas
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="left" className="max-w-xs">
-              <p>Copiar todas as métricas e o resumo por ativo (JSON) para a área de transferência.</p>
-            </TooltipContent>
-          </Tooltip>
-        </div>
+        <AccountHistoryCard trades={tradesForCard} />
       </div>
-    </TooltipProvider>
-  )
+
+      <div className="fixed right-4 bottom-24 md:bottom-8 z-40">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              size="lg"
+              onClick={copyMetricsToClipboard}
+              className="rounded-full shadow-xl bg-[#1e78e0] text-white hover:bg-[#1663b8] border border-white/20"
+              aria-label="Copiar métricas da conta"
+            >
+              <Sparkles className="h-5 w-5 mr-2" />
+              Copiar métricas
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="left" className="max-w-xs">
+            <p>Copiar todas as métricas e o resumo por ativo (JSON) para a área de transferência.</p>
+          </TooltipContent>
+        </Tooltip>
+      </div>
+    </div>
+  </TooltipProvider>
+)
+
 }

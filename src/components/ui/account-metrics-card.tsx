@@ -21,7 +21,7 @@ export function AccountMetricsCard({ metrics }: AccountMetricsProps) {
 
   return (
     <Card className="bg-[#0f1d31] border border-[#1e2c46] rounded-2xl shadow-md">
-      <CardContent className="px-3 py-2">
+      <CardContent className="px-3">
         {/* Título com Pill */}
         <div className="mb-2 flex items-center gap-2">
           <Pill dotColor="bg-blue-500" className="px-2 py-0.5 text-[10px] font-medium">
