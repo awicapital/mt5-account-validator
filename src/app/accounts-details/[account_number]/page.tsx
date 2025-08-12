@@ -19,7 +19,8 @@ import { Pill } from '@/components/ui/pill'
 import { computeMetrics } from '@/lib/metricsCalculation'
 
 // ---------------- Types ----------------
-type Trade = {
+// Dados crus vindos do JSON no Storage
+type RawTrade = {
   account_number: number
   date: string
   symbol: string
@@ -28,6 +29,7 @@ type Trade = {
   profit: number
 }
 
+// Shape usado internamente nos cálculos/histórico
 export type HistoryTrade = {
   id: string
   date: string
@@ -38,25 +40,38 @@ export type HistoryTrade = {
   volume: number
 }
 
+// Tipos auxiliares para UI
+type TradeSide = 'buy' | 'sell'
+type CardTrade = Omit<HistoryTrade, 'type'> & { type: TradeSide }
+
+type SymbolAgg = {
+  symbol: string
+  trades: number
+  volume: number
+  profit: number
+  avgPerTrade?: number
+}
+
 // -------------- Helpers --------------
-function isTradeArray(x: unknown): x is Trade[] {
+function isTradeArray(x: unknown): x is RawTrade[] {
   if (!Array.isArray(x)) return false
-  return x.every(
-    (t) =>
-      t &&
-      typeof t === 'object' &&
-      typeof (t as any).date === 'string' &&
-      typeof (t as any).symbol === 'string' &&
-      typeof (t as any).type === 'string' &&
-      typeof (t as any).volume === 'number' &&
-      typeof (t as any).profit === 'number'
-  )
+  return x.every((t) => {
+    if (!t || typeof t !== 'object') return false
+    const v = t as Record<string, unknown>
+    return (
+      typeof v.date === 'string' &&
+      typeof v.symbol === 'string' &&
+      typeof v.type === 'string' &&
+      typeof v.volume === 'number' &&
+      typeof v.profit === 'number'
+    )
+  })
 }
 
 async function loadTradesFromStorage(
   bucket: string,
   path: string
-): Promise<{ data: Trade[]; lastModified: string | null }> {
+): Promise<{ data: RawTrade[]; lastModified: string | null }> {
   const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(path)
   const publicUrl = urlData?.publicUrl
 
@@ -66,10 +81,11 @@ async function loadTradesFromStorage(
       const head = await fetch(`${publicUrl}?v=${Date.now()}`, { method: 'HEAD' })
       if (head.ok) lastModified = head.headers.get('last-modified')
     } catch {
-      // Silencia HEAD bloqueado
+      // HEAD pode ser bloqueado pelo provedor; silencie
     }
   }
 
+  // Tenta via SDK (evita CORS)
   const { data: blob, error: dlError } = await supabase.storage.from(bucket).download(path)
 
   if (!dlError && blob) {
@@ -84,6 +100,7 @@ async function loadTradesFromStorage(
     }
   }
 
+  // Fallback para URL pública
   if (publicUrl) {
     const res = await fetch(`${publicUrl}?v=${Date.now()}`, { cache: 'no-store' })
     if (!res.ok) throw new Error('Erro ao baixar arquivo JSON público.')
@@ -106,7 +123,7 @@ export default function AccountDetailsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
-  const [rawTrades, setRawTrades] = useState<Trade[]>([])
+  const [rawTrades, setRawTrades] = useState<RawTrade[]>([])
   const mountedRef = useRef(true)
 
   useEffect(() => {
@@ -152,7 +169,7 @@ export default function AccountDetailsPage() {
     }))
 
     return computeMetrics(
-      normalized.map((t) => ({
+      normalized.map<HistoryTrade>((t) => ({
         id: `${accountNumber}-${t.date}`,
         date: t.date,
         type: t.type,
@@ -198,8 +215,22 @@ export default function AccountDetailsPage() {
     )
   }
 
+  // Estrutura que vem do computeMetrics; usamos any no agregado, mas tipamos onde importa
   const { logs, tradesNoCashflow, perSymbol, totals, ratios, byDaySorted } = computed as any
 
+  // ---- Dados tipados para os gráficos/cards ----
+  const symbolChartData = (perSymbol as ReadonlyArray<SymbolAgg>).map((s) => ({
+    symbol: s.symbol,
+    trades: s.trades,
+    volume: s.volume,
+    profit: s.profit,
+  }))
+
+  // Apenas operações 'buy' | 'sell' no card de histórico
+  const isSideTrade = (t: HistoryTrade): t is CardTrade => t.type === 'buy' || t.type === 'sell'
+  const tradesForCard: ReadonlyArray<CardTrade> = (tradesNoCashflow as ReadonlyArray<HistoryTrade>).filter(isSideTrade)
+
+  // ---- Métricas exibidas ----
   const metrics = [
     { label: 'Número de Trades', value: tradesNoCashflow.length, hint: 'Quantidade total de operações realizadas na conta.' },
     { label: 'Win Rate', value: `${(ratios.winRate * 100).toFixed(2)}%`, hint: 'Porcentagem de trades com lucro.' },
@@ -256,7 +287,7 @@ export default function AccountDetailsPage() {
           bestDay: (Array.isArray(byDaySorted) && byDaySorted[0]) ? { date: byDaySorted[0][0], pnl: Number(Number(byDaySorted[0][1]).toFixed(2)) } : null,
           worstDay: (Array.isArray(byDaySorted) && byDaySorted.at(-1)) ? { date: byDaySorted.at(-1)![0], pnl: Number(Number(byDaySorted.at(-1)![1]).toFixed(2)) } : null,
         },
-        bySymbol: (perSymbol as any[]).map((s) => ({
+        bySymbol: (perSymbol as ReadonlyArray<SymbolAgg>).map((s) => ({
           symbol: s.symbol,
           trades: s.trades,
           volume: s.volume,
@@ -324,16 +355,9 @@ export default function AccountDetailsPage() {
 
           <AccountMetricsCard metrics={metrics} />
 
-          <AccountSymbolsChart
-            data={(perSymbol as any[]).map((s) => ({
-              symbol: s.symbol,
-              trades: s.trades,
-              volume: s.volume,
-              profit: s.profit,
-            }))}
-          />
+          <AccountSymbolsChart data={symbolChartData} />
 
-          <AccountHistoryCard trades={tradesNoCashflow as unknown as HistoryTrade[]} />
+          <AccountHistoryCard trades={tradesForCard} />
         </div>
 
         <div className="fixed right-4 bottom-24 md:bottom-8 z-40">
