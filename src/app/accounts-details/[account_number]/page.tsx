@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { Loader2, Sparkles } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
@@ -18,6 +18,7 @@ import { Pill } from '@/components/ui/pill'
 
 import { computeMetrics } from '@/lib/metricsCalculation'
 
+// ---------------- Types ----------------
 type Trade = {
   account_number: number
   date: string
@@ -27,7 +28,7 @@ type Trade = {
   profit: number
 }
 
-type HistoryTrade = {
+export type HistoryTrade = {
   id: string
   date: string
   type: string
@@ -37,6 +38,67 @@ type HistoryTrade = {
   volume: number
 }
 
+// -------------- Helpers --------------
+function isTradeArray(x: unknown): x is Trade[] {
+  if (!Array.isArray(x)) return false
+  return x.every(
+    (t) =>
+      t &&
+      typeof t === 'object' &&
+      typeof (t as any).date === 'string' &&
+      typeof (t as any).symbol === 'string' &&
+      typeof (t as any).type === 'string' &&
+      typeof (t as any).volume === 'number' &&
+      typeof (t as any).profit === 'number'
+  )
+}
+
+async function loadTradesFromStorage(
+  bucket: string,
+  path: string
+): Promise<{ data: Trade[]; lastModified: string | null }> {
+  const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(path)
+  const publicUrl = urlData?.publicUrl
+
+  let lastModified: string | null = null
+  if (publicUrl) {
+    try {
+      const head = await fetch(`${publicUrl}?v=${Date.now()}`, { method: 'HEAD' })
+      if (head.ok) lastModified = head.headers.get('last-modified')
+    } catch {
+      // Silencia HEAD bloqueado
+    }
+  }
+
+  const { data: blob, error: dlError } = await supabase.storage.from(bucket).download(path)
+
+  if (!dlError && blob) {
+    try {
+      const text = await blob.text()
+      const json = JSON.parse(text)
+      if (!isTradeArray(json)) throw new Error('Formato inesperado do JSON (download).')
+      return { data: json, lastModified }
+    } catch (e) {
+      console.error('[AccountDetails] Erro parseando JSON do download:', e)
+      throw e
+    }
+  }
+
+  if (publicUrl) {
+    const res = await fetch(`${publicUrl}?v=${Date.now()}`, { cache: 'no-store' })
+    if (!res.ok) throw new Error('Erro ao baixar arquivo JSON público.')
+    if (!lastModified) lastModified = res.headers.get('last-modified')
+    const json = await res.json()
+    if (!isTradeArray(json)) throw new Error('Formato inesperado do JSON (publicUrl).')
+    return { data: json, lastModified }
+  }
+
+  throw dlError ?? new Error('Não foi possível obter o arquivo do Storage.')
+}
+
+const normalizeDate = (s: string) => (s?.includes('T') ? s : s?.replace(' ', 'T'))
+
+// -------------- Page --------------
 export default function AccountDetailsPage() {
   const { account_number } = useParams<{ account_number: string }>()
   const accountNumber = Number(account_number)
@@ -45,34 +107,38 @@ export default function AccountDetailsPage() {
   const [error, setError] = useState<string | null>(null)
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
   const [rawTrades, setRawTrades] = useState<Trade[]>([])
+  const mountedRef = useRef(true)
 
   useEffect(() => {
-    (async () => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
+
+  useEffect(() => {
+    ;(async () => {
       if (Number.isNaN(accountNumber)) {
         setError('Número de conta inválido.')
         setLoading(false)
         return
       }
+      setError(null)
+      setLoading(true)
       try {
         const path = `${accountNumber}.json`
-        const { data: urlData } = supabase.storage.from('logs').getPublicUrl(path)
-        const url = urlData?.publicUrl
-        if (!url) throw new Error('Não conseguiu gerar URL pública.')
+        const { data, lastModified } = await loadTradesFromStorage('logs', path)
 
-        const res = await fetch(`${url}?v=${Date.now()}`, { cache: 'no-store' })
-        if (!res.ok) throw new Error('Erro ao baixar arquivo JSON público.')
-        const lm = res.headers.get('last-modified')
-        if (lm) setLastUpdated(new Date(lm).toISOString())
-
-        const arr = (await res.json()) as unknown
-        if (!Array.isArray(arr)) throw new Error('Formato inesperado do JSON.')
-        setRawTrades(arr as Trade[])
+        if (!mountedRef.current) return
+        setRawTrades(data)
+        setLastUpdated(lastModified ? new Date(lastModified).toISOString() : new Date().toISOString())
       } catch (e: unknown) {
-        const message =
-          e instanceof Error ? e.message : typeof e === 'string' ? e : 'Erro ao carregar dados'
+        const message = e instanceof Error ? e.message : typeof e === 'string' ? e : 'Erro ao carregar dados'
+        console.error('[AccountDetails] Falha ao carregar trades:', e)
+        if (!mountedRef.current) return
         setError(message)
       } finally {
-        setLoading(false)
+        if (mountedRef.current) setLoading(false)
       }
     })()
   }, [accountNumber])
@@ -80,13 +146,13 @@ export default function AccountDetailsPage() {
   const computed = useMemo(() => {
     if (!rawTrades.length) return null
 
-    const normalized = rawTrades.map(t => ({
+    const normalized = rawTrades.map((t) => ({
       ...t,
-      date: t.date.includes('T') ? t.date : t.date.replace(' ', 'T'),
+      date: normalizeDate(t.date),
     }))
 
     return computeMetrics(
-      normalized.map(t => ({
+      normalized.map((t) => ({
         id: `${accountNumber}-${t.date}`,
         date: t.date,
         type: t.type,
@@ -95,13 +161,17 @@ export default function AccountDetailsPage() {
         symbol: t.symbol,
         volume: t.volume,
       })),
-      { includeCashflowInLogs: false }
+      {
+        includeCashflowInLogs: false,
+        monthFormat: 'YYYY.MM',
+        initialEquity: 0,
+      }
     )
   }, [rawTrades, accountNumber])
 
   if (loading) {
     return (
-      <div className="h-dvh flex items-center justify-center bg-[#03182f]">
+      <div className="h-dvh flex items-center justify-center bg-[#03182f]" aria-busy>
         <Loader2 className="animate-spin w-6 h-6 text-white" />
       </div>
     )
@@ -109,16 +179,26 @@ export default function AccountDetailsPage() {
 
   if (error || !computed) {
     return (
-      <div className="h-dvh flex items-center justify-center bg-[#03182f] text-white">
+      <div className="h-dvh flex items-center justify-center bg-[#03182f] text-white" aria-live="polite">
         <div className="text-center space-y-4">
           <p className="text-lg font-semibold">Erro ao carregar dados da conta</p>
           <p className="text-sm text-white/70">{error ?? 'Dados indisponíveis.'}</p>
+          <div className="text-xs text-white/50 max-w-md mx-auto">
+            <p className="mb-1">Dicas de diagnóstico:</p>
+            <ul className="list-disc pl-5 space-y-1 text-left">
+              <li>
+                Confirme se o arquivo existe no bucket <code>logs</code> com o nome <code>{String(accountNumber)}.json</code>.
+              </li>
+              <li>Se estiver em subpasta, ajuste <code>path</code> no código.</li>
+              <li>Verifique CORS/privacidade do bucket. O SDK <code>download</code> contorna CORS.</li>
+            </ul>
+          </div>
         </div>
       </div>
     )
   }
 
-  const { logs, tradesNoCashflow, perSymbol, totals, ratios, byDaySorted } = computed
+  const { logs, tradesNoCashflow, perSymbol, totals, ratios, byDaySorted } = computed as any
 
   const metrics = [
     { label: 'Número de Trades', value: tradesNoCashflow.length, hint: 'Quantidade total de operações realizadas na conta.' },
@@ -131,7 +211,7 @@ export default function AccountDetailsPage() {
     { label: 'Profit Factor', value: ratios.profitFactor === Infinity ? '∞' : ratios.profitFactor.toFixed(2), hint: 'Lucro bruto dividido pelo prejuízo bruto.' },
     { label: 'Payoff Ratio', value: ratios.payoffRatio === Infinity ? '∞' : ratios.payoffRatio.toFixed(2), hint: 'Lucro médio / prejuízo médio.' },
     { label: 'Gain to Pain Ratio', value: ratios.gainToPain === Infinity ? '∞' : ratios.gainToPain.toFixed(2), hint: 'Lucro total dividido pelas perdas totais.' },
-    { label: 'Max Drawdown', value: `$${ratios.maxDD.toFixed(2)}`, hint: 'Maior queda acumulada desde um topo.' },
+    { label: 'Max Drawdown', value: `$${ratios.maxDD.toFixed(2)}` , hint: 'Maior queda acumulada desde um topo.' },
     { label: 'Ulcer Index', value: ratios.ulcerIndex.toFixed(2), hint: 'Índice que mede profundidade e duração dos drawdowns.' },
     { label: 'Recovery Factor', value: ratios.recoveryFactor === Infinity ? '∞' : ratios.recoveryFactor.toFixed(2), hint: 'Lucro líquido dividido pelo drawdown máximo.' },
     { label: 'Sharpe Ratio', value: ratios.sharpeRatio === Infinity ? '∞' : ratios.sharpeRatio.toFixed(2), hint: 'Retorno ajustado pela volatilidade.' },
@@ -141,7 +221,7 @@ export default function AccountDetailsPage() {
     { label: 'SQN (System Quality)', value: ratios.sqn === Infinity ? '∞' : ratios.sqn.toFixed(2), hint: 'Índice de qualidade estatística da estratégia.' },
     { label: 'Melhor Dia', value: ratios.bestDay ? `${ratios.bestDay[0]} ($${ratios.bestDay[1].toFixed(2)})` : '-', hint: 'Maior lucro diário.' },
     { label: 'Pior Dia', value: ratios.worstDay ? `${ratios.worstDay[0]} ($${ratios.worstDay[1].toFixed(2)})` : '-', hint: 'Maior prejuízo diário.' },
-  ]
+  ] as const
 
   const buildClipboardJSON = () =>
     JSON.stringify(
@@ -149,39 +229,39 @@ export default function AccountDetailsPage() {
         account: {
           id: accountNumber,
           lastUpdated,
-          currentBalance: Number(totals.currentBalance.toFixed(2)),
-          pnlTotal: Number(totals.pnlTotal.toFixed(2)),
-          deposits: Number(totals.deposits.toFixed(2)),
-          withdrawals: Number(totals.withdrawals.toFixed(2)),
+          currentBalance: Number(Number(totals.currentBalance).toFixed(2)),
+          pnlTotal: Number(Number(totals.pnlTotal).toFixed(2)),
+          deposits: Number(Number(totals.deposits).toFixed(2)),
+          withdrawals: Number(Number(totals.withdrawals).toFixed(2)),
         },
         metrics: {
           trades: tradesNoCashflow.length,
           winRate: Number((ratios.winRate * 100).toFixed(2)),
           lossRate: Number((ratios.lossRate * 100).toFixed(2)),
           breakevenRate: Number((ratios.breakevenRate * 100).toFixed(2)),
-          avgWin: Number(ratios.avgWin.toFixed(2)),
-          avgLoss: Number(ratios.avgLoss.toFixed(2)),
-          expectancy: Number(ratios.expectancy.toFixed(2)),
+          avgWin: Number(Number(ratios.avgWin).toFixed(2)),
+          avgLoss: Number(Number(ratios.avgLoss).toFixed(2)),
+          expectancy: Number(Number(ratios.expectancy).toFixed(2)),
           profitFactor: Number((ratios.profitFactor === Infinity ? 0 : ratios.profitFactor).toFixed(4)),
           payoffRatio: Number((ratios.payoffRatio === Infinity ? 0 : ratios.payoffRatio).toFixed(4)),
           gainToPain: Number((ratios.gainToPain === Infinity ? 0 : ratios.gainToPain).toFixed(4)),
-          maxDrawdown: Number(ratios.maxDD.toFixed(2)),
-          ulcerIndex: Number(ratios.ulcerIndex.toFixed(4)),
+          maxDrawdown: Number(Number(ratios.maxDD).toFixed(2)),
+          ulcerIndex: Number(Number(ratios.ulcerIndex).toFixed(4)),
           recoveryFactor: Number((ratios.recoveryFactor === Infinity ? 0 : ratios.recoveryFactor).toFixed(4)),
           sharpeRatio: Number((ratios.sharpeRatio === Infinity ? 0 : ratios.sharpeRatio).toFixed(4)),
           sortinoRatio: Number((ratios.sortinoRatio === Infinity ? 0 : ratios.sortinoRatio).toFixed(4)),
-          averageTrade: Number(ratios.averageTrade.toFixed(2)),
-          stdDev: Number(ratios.stdDev.toFixed(2)),
+          averageTrade: Number(Number(ratios.averageTrade).toFixed(2)),
+          stdDev: Number(Number(ratios.stdDev).toFixed(2)),
           sqn: Number((ratios.sqn === Infinity ? 0 : ratios.sqn).toFixed(4)),
-          bestDay: byDaySorted[0] ? { date: byDaySorted[0][0], pnl: Number(byDaySorted[0][1].toFixed(2)) } : null,
-          worstDay: byDaySorted.at(-1) ? { date: byDaySorted.at(-1)![0], pnl: Number(byDaySorted.at(-1)![1].toFixed(2)) } : null,
+          bestDay: (Array.isArray(byDaySorted) && byDaySorted[0]) ? { date: byDaySorted[0][0], pnl: Number(Number(byDaySorted[0][1]).toFixed(2)) } : null,
+          worstDay: (Array.isArray(byDaySorted) && byDaySorted.at(-1)) ? { date: byDaySorted.at(-1)![0], pnl: Number(Number(byDaySorted.at(-1)![1]).toFixed(2)) } : null,
         },
-        bySymbol: perSymbol.map(s => ({
+        bySymbol: (perSymbol as any[]).map((s) => ({
           symbol: s.symbol,
           trades: s.trades,
           volume: s.volume,
-          grossProfit: Number(s.profit.toFixed(2)),
-          avgPerTrade: Number(s.avgPerTrade.toFixed(2)),
+          grossProfit: Number(Number(s.profit).toFixed(2)),
+          avgPerTrade: Number(Number(s.avgPerTrade).toFixed(2)),
         })),
       },
       null,
@@ -221,7 +301,7 @@ export default function AccountDetailsPage() {
           withBorder
         />
 
-        {/* Pill com número da conta e bolinha verde (mesmo estilo do componente Pill) */}
+        {/* Pill com número da conta e bolinha verde */}
         <div className="pt-2">
           <Pill dotColor="bg-green-500">{accountNumber}</Pill>
         </div>
@@ -243,14 +323,16 @@ export default function AccountDetailsPage() {
           <AccountChartCard logs={logs} />
 
           <AccountMetricsCard metrics={metrics} />
+
           <AccountSymbolsChart
-            data={perSymbol.map(s => ({
+            data={(perSymbol as any[]).map((s) => ({
               symbol: s.symbol,
               trades: s.trades,
               volume: s.volume,
               profit: s.profit,
             }))}
           />
+
           <AccountHistoryCard trades={tradesNoCashflow as unknown as HistoryTrade[]} />
         </div>
 

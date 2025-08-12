@@ -1,8 +1,10 @@
 'use client'
 
-import { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
 import { Card, CardContent } from '@/components/ui/card'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Info } from 'lucide-react'
+import { Pill } from '@/components/ui/pill'
+import { useState } from 'react'
 
 interface Metric {
   label: string
@@ -15,56 +17,50 @@ interface AccountMetricsProps {
 }
 
 export function AccountMetricsCard({ metrics }: AccountMetricsProps) {
-  const [activeIndex, setActiveIndex] = useState<number | null>(null)
-
-  const toggle = (index: number) => {
-    setActiveIndex((prev) => (prev === index ? null : index))
-  }
+  const [openIndex, setOpenIndex] = useState<number | null>(null)
 
   return (
-    <Card className="bg-[#0f1d31] border border-[#1e2c46] shadow-md rounded-2xl">
-      <CardContent className="pt-6 pb-4 px-6 space-y-4">
-        <h3 className="text-white font-semibold text-base">Métricas Avançadas</h3>
+    <Card className="bg-[#0f1d31] border border-[#1e2c46] rounded-2xl shadow-md">
+      <CardContent className="px-3 py-2">
+        {/* Título com Pill */}
+        <div className="mb-2 flex items-center gap-2">
+          <Pill dotColor="bg-blue-500" className="px-2 py-0.5 text-[10px] font-medium">
+            Métricas
+          </Pill>
+        </div>
 
-        <div className="flex flex-col text-sm text-white">
-          {metrics.map((metric, index) => {
-            const isActive = activeIndex === index
-            const isLast = index === metrics.length - 1
-
+        {/* Lista com linha divisória */}
+        <div className="flex flex-col divide-y divide-[#1e2c46] text-[11px] leading-tight text-white/80">
+          {metrics.map((m, i) => {
+            const isOpen = openIndex === i
             return (
-              <div key={index}>
-                <motion.div
-                  onClick={() => toggle(index)}
-                  className={`relative py-2 cursor-pointer transition-all rounded-md ${
-                    isActive
-                      ? 'px-4 -mx-2 bg-[#1e2c46] border border-[#3b82f6]'
-                      : 'hover:bg-white/5 border border-transparent'
-                  }`}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.015, duration: 0.25 }}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">{metric.label}</span>
-                    <span className="font-semibold whitespace-nowrap">{metric.value}</span>
-                  </div>
-
-                  <AnimatePresence>
-                    {isActive && (
-                      <motion.div
-                        className="mt-1 text-white/80 text-xs leading-snug"
-                        initial={{ opacity: 0, y: 6 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: 6 }}
-                        transition={{ duration: 0.25 }}
+              <div
+                key={i}
+                className="flex items-center justify-between truncate py-1"
+              >
+                <div className="flex items-center gap-1 min-w-0">
+                  <span className="truncate">{m.label}</span>
+                  <Popover open={isOpen} onOpenChange={(o) => setOpenIndex(o ? i : null)}>
+                    <PopoverTrigger asChild>
+                      <button
+                        className="p-0.5 text-white/50 hover:text-white focus:outline-none"
+                        aria-label={`Sobre ${m.label}`}
                       >
-                        {metric.hint}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </motion.div>
+                        <Info className="h-3 w-3" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      side="top"
+                      align="start"
+                      sideOffset={4}
+                      className="max-w-xs text-[10px] leading-snug py-1 px-2"
+                    >
+                      {m.hint}
+                    </PopoverContent>
+                  </Popover>
+                </div>
 
-                {!isLast && <div className="h-px bg-[#1e2c46]" />}
+                <span className="font-medium tabular-nums truncate text-white">{m.value}</span>
               </div>
             )
           })}
