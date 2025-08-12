@@ -12,7 +12,7 @@ interface Trade {
 }
 
 interface AccountHistoryCardProps {
-  trades: Trade[]
+  trades: ReadonlyArray<Trade>
 }
 
 function formatMoney(v: number) {
