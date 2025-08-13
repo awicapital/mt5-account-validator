@@ -28,6 +28,15 @@ export default function LoginPage() {
     return () => { document.body.style.overflow = prev; };
   }, []);
 
+  // Detecta sessão ativa (inclusive após login via Discord)
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data } = await supabase.auth.getSession();
+      if (data.session) router.push("/dashboard");
+    };
+    checkSession();
+  }, [router]);
+
   const handleLogin = async () => {
     setLoading(true);
     if (!email || !senha) {
@@ -39,13 +48,18 @@ export default function LoginPage() {
     if (error) toast.error(error.message);
     else {
       toast.success("Login realizado!");
-      router.push("/dashboard-m");
+      router.push("/dashboard");
     }
     setLoading(false);
   };
 
   const handleDiscordLogin = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({ provider: "discord" });
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "discord",
+      options: {
+        redirectTo: `${window.location.origin}/login`,
+      },
+    });
     if (error) toast.error("Erro ao entrar com Discord: " + error.message);
   };
 
@@ -113,24 +127,23 @@ export default function LoginPage() {
               </Button>
             </form>
 
-{/* Botão Discord OAuth */}
-<div className="pt-6">
-  <Button
-    onClick={handleDiscordLogin}
-    className="
-      flex items-center justify-center gap-2
-      w-full py-2
-      bg-[#5865F2]/20 backdrop-blur-sm
-      border border-[#5865F2]/50
-      text-white              /* texto em branco */
-      font-semibold rounded-lg shadow-md
-      hover:bg-[#5865F2]/30 transition-all duration-200
-    "
-  >
-    <FaDiscord size={20} color="#FFF" />  {/* ícone em branco */}
-    Entrar com Discord
-  </Button>
-</div>
+            {/* Botão Discord OAuth */}
+            <div className="pt-6">
+              <Button
+                onClick={handleDiscordLogin}
+                className="
+                  flex items-center justify-center gap-2
+                  w-full py-2
+                  bg-[#5865F2]/20 backdrop-blur-sm
+                  border border-[#5865F2]/50
+                  text-white font-semibold rounded-lg shadow-md
+                  hover:bg-[#5865F2]/30 transition-all duration-200
+                "
+              >
+                <FaDiscord size={20} color="#FFF" />
+                Entrar com Discord
+              </Button>
+            </div>
 
             {/* Link para registro */}
             <p className="mt-4 text-center text-sm text-gray-400">

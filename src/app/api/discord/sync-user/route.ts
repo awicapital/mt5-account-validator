@@ -1,66 +1,93 @@
-// src/app/api/cron/discord-sync/route.ts
 import { NextRequest, NextResponse } from "next/server";
+// ajuste o caminho se seu client estiver noutro lugar
 import { supabase } from "@/lib/supabase";
 import { DiscordClient } from "@/lib/discord";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(_req: NextRequest) {
-  const lookback = Number(process.env.SYNC_LOOKBACK_MINUTES || 1440); // 24h
-  const limit = Number(process.env.SYNC_MAX_USERS_PER_RUN || 1000);
-  const since = new Date(Date.now() - lookback * 60 * 1000).toISOString();
-  const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
+export async function POST(req: NextRequest) {
+  // proteção simples via header secreto
+  const secret = req.headers.get("x-admin-sync-secret");
+  if (process.env.ADMIN_SYNC_SECRET && secret !== process.env.ADMIN_SYNC_SECRET) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
 
-  const discord = new DiscordClient(
-    process.env.DISCORD_BOT_TOKEN!,
-    process.env.DISCORD_GUILD_ID!,
-    process.env.DISCORD_PRO_ROLE_ID!
-  );
-  const starterRoleId = process.env.DISCORD_STARTER_ROLE_ID; // opcional
+  // valida body
+  const { user_id } = await req.json().catch(() => ({} as any));
+  if (!user_id || typeof user_id !== "string") {
+    return NextResponse.json({ error: "user_id required" }, { status: 400 });
+  }
 
-  // pega usuários que mudaram recentemente / precisam de sync periódico
+  const {
+    DISCORD_BOT_TOKEN,
+    DISCORD_GUILD_ID,
+    DISCORD_PRO_ROLE_ID,
+    DISCORD_STARTER_ROLE_ID,
+  } = process.env;
+
+  if (!DISCORD_BOT_TOKEN || !DISCORD_GUILD_ID || !DISCORD_PRO_ROLE_ID) {
+    return NextResponse.json({ error: "Missing Discord env vars" }, { status: 500 });
+  }
+
+  // busca dados na VIEW (centralizada em public.users)
   const { data, error } = await supabase
     .from("discord_links_view")
-    .select("user_id, discord_user_id, pro_active, last_role_sync, updated_at")
-    .or(`updated_at.gt.${since},last_role_sync.is.null,last_role_sync.lt.${sixHoursAgo}`)
-    .limit(limit);
+    .select("discord_user_id, pro_active")
+    .eq("user_id", user_id)
+    .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error || !data) {
+    return NextResponse.json({ error: "not found" }, { status: 404 });
+  }
 
-  const results: any[] = [];
+  // valida discord_user_id
+  const discordUserId = data.discord_user_id as string | null;
+  if (!discordUserId) {
+    return NextResponse.json({ error: "missing discord_user_id" }, { status: 422 });
+  }
+  if (!/^\d+$/.test(discordUserId)) {
+    return NextResponse.json({ error: "invalid discord_user_id (must be snowflake)" }, { status: 422 });
+  }
 
-  for (const row of data ?? []) {
-    try {
-      const member = await discord.getMember(row.discord_user_id);
-      if (!member) {
-        results.push({ user_id: row.user_id, status: "skip:not_in_guild" });
-        continue;
-      }
+  const discord = new DiscordClient(DISCORD_BOT_TOKEN!, DISCORD_GUILD_ID!, DISCORD_PRO_ROLE_ID!);
+  const starterRoleId = DISCORD_STARTER_ROLE_ID || null;
 
-      const hasPro = member.roles.includes(process.env.DISCORD_PRO_ROLE_ID!);
-      const hasStarter = starterRoleId ? member.roles.includes(starterRoleId) : false;
+  // checa se o membro está no servidor
+  const member = await discord.getMember(discordUserId);
+  if (!member) {
+    return NextResponse.json({ error: "user not in guild" }, { status: 409 });
+  }
 
-      if (row.pro_active) {
-        // garantir PRO
-        if (!hasPro) await discord.addProRole(row.discord_user_id);
-        // opcional: remover STARTER se existir
-        if (starterRoleId && hasStarter) await discord.removeRole(row.discord_user_id, starterRoleId);
-        results.push({ user_id: row.user_id, action: hasPro ? "noop" : "add:PRO" });
-      } else {
-        // garantir que PRO não esteja e (opcional) dar STARTER
-        if (hasPro) await discord.removeProRole(row.discord_user_id);
-        if (starterRoleId && !hasStarter) await discord.addRole(row.discord_user_id, starterRoleId);
-        results.push({ user_id: row.user_id, action: hasPro ? "remove:PRO" : (starterRoleId ? "add:STARTER" : "noop") });
-      }
+  const hasPro = member.roles.includes(DISCORD_PRO_ROLE_ID!);
+  const hasStarter = starterRoleId ? member.roles.includes(starterRoleId) : false;
 
-      await supabase
-        .from("discord_meta")
-        .update({ last_role_sync: new Date().toISOString() })
-        .eq("user_id", row.user_id);
-    } catch (e: any) {
-      results.push({ user_id: row.user_id, error: e.message });
+  // aplica/remover roles conforme pro_active
+  let action: string = "noop";
+  if (data.pro_active) {
+    if (!hasPro) {
+      await discord.addProRole(discordUserId);
+      action = "add:PRO";
+    }
+    if (starterRoleId && hasStarter) {
+      await discord.removeRole(discordUserId, starterRoleId);
+      action = action === "noop" ? "remove:STARTER" : `${action}+remove:STARTER`;
+    }
+  } else {
+    if (hasPro) {
+      await discord.removeProRole(discordUserId);
+      action = "remove:PRO";
+    }
+    if (starterRoleId && !hasStarter) {
+      await discord.addRole(discordUserId, starterRoleId);
+      action = action === "noop" ? "add:STARTER" : `${action}+add:STARTER`;
     }
   }
 
-  return NextResponse.json({ count: results.length, results });
+  // carimbo de sync agora em public.users
+  await supabase
+    .from("users")
+    .update({ last_role_sync: new Date().toISOString() })
+    .eq("id", user_id);
+
+  return NextResponse.json({ ok: true, action });
 }
