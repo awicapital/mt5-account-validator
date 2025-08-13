@@ -1,5 +1,5 @@
 // src/app/(public)/register/page.tsx
-//"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
