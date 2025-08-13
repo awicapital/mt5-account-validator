@@ -1,4 +1,3 @@
-// src/app/(public)/register/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -34,7 +33,7 @@ export default function RegisterPage() {
     }
     setLoading(true);
 
-    // 1. Cria usuário no Auth
+    // 1. Cria usuário no Supabase Auth com metadata inicial
     const { data, error } = await supabase.auth.signUp({
       email,
       password: senha,
@@ -47,32 +46,34 @@ export default function RegisterPage() {
       return;
     }
 
-    if (data.user) {
-      // 2. Atualiza metadados (opcional)
-      const { error: updateError } = await supabase.auth.updateUser({
-        data: { nome },
-      });
-      if (updateError) {
-        toast.error("Erro ao atualizar nome: " + updateError.message);
-      }
+    // 2. Aguarda sessão válida
+    const sessionRes = await supabase.auth.getSession();
+    const session = sessionRes.data.session;
 
-      // 3. Cria entrada na tabela `users`
-      const { error: insertError } = await supabase.from("users").insert({
-        email,
+    if (session) {
+      const userId = session.user.id;
+
+      // 3. Força atualização do metadata (caso não tenha sido salvo no signUp)
+      await supabase.auth.updateUser({ data: { nome } });
+
+      // 4. Atualiza full_name na tabela users (criada automaticamente pela trigger)
+      const { error: updateError } = await supabase.from("users").update({
         full_name: nome,
-        access_level: "STARTER",
-      });
+      }).eq("id", userId);
 
-      if (insertError) {
-        toast.error("Erro ao salvar dados extras: " + insertError.message);
+      if (updateError) {
+        toast.error("Erro ao salvar nome: " + updateError.message);
         setLoading(false);
         return;
       }
+
+      toast.success("Conta criada com sucesso!");
+      router.push("/dashboard");
+    } else {
+      toast("Verifique seu e-mail para ativar a conta.");
     }
 
-    toast.success("Conta criada com sucesso!");
     setLoading(false);
-    router.push("/dashboard-m");
   };
 
   return (
