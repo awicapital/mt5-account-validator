@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
+import { isMobile } from "react-device-detect";
 
 import { FaDiscord } from "react-icons/fa";
 import { Input } from "@/components/ui/input";
@@ -54,13 +55,27 @@ export default function LoginPage() {
   };
 
   const handleDiscordLogin = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "discord",
-      options: {
-        redirectTo: `${window.location.origin}/login`,
-      },
-    });
-    if (error) toast.error("Erro ao entrar com Discord: " + error.message);
+    if (isMobile) {
+      // Tenta abrir o app Discord antes do fluxo OAuth
+      window.location.href = "discord://";
+      setTimeout(async () => {
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: "discord",
+          options: {
+            redirectTo: `${window.location.origin}/login`,
+          },
+        });
+        if (error) toast.error("Erro ao entrar com Discord: " + error.message);
+      }, 800); // delay para fallback funcionar
+    } else {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "discord",
+        options: {
+          redirectTo: `${window.location.origin}/login`,
+        },
+      });
+      if (error) toast.error("Erro ao entrar com Discord: " + error.message);
+    }
   };
 
   return (
@@ -141,7 +156,7 @@ export default function LoginPage() {
                 "
               >
                 <FaDiscord size={20} color="#FFF" />
-                Entrar com Discord
+                {isMobile ? "Entrar com app do Discord" : "Entrar com Discord"}
               </Button>
             </div>
 

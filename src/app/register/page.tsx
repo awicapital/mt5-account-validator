@@ -19,7 +19,6 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  // bloqueia scroll no body enquanto a página estiver montada
   useEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -35,6 +34,7 @@ export default function RegisterPage() {
     }
     setLoading(true);
 
+    // 1. Cria usuário no Auth
     const { data, error } = await supabase.auth.signUp({
       email,
       password: senha,
@@ -48,11 +48,25 @@ export default function RegisterPage() {
     }
 
     if (data.user) {
+      // 2. Atualiza metadados (opcional)
       const { error: updateError } = await supabase.auth.updateUser({
         data: { nome },
       });
       if (updateError) {
         toast.error("Erro ao atualizar nome: " + updateError.message);
+      }
+
+      // 3. Cria entrada na tabela `users`
+      const { error: insertError } = await supabase.from("users").insert({
+        email,
+        full_name: nome,
+        access_level: "STARTER",
+      });
+
+      if (insertError) {
+        toast.error("Erro ao salvar dados extras: " + insertError.message);
+        setLoading(false);
+        return;
       }
     }
 
@@ -73,17 +87,13 @@ export default function RegisterPage() {
       <div className="w-full max-w-md">
         <Card className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl shadow-lg">
           <CardContent className="px-8 py-10 space-y-6">
-            {/* Cabeçalho sem logo */}
             <div className="flex flex-col items-center space-y-2">
-              <h2 className="text-xl font-semibold text-white">
-                Criar conta
-              </h2>
+              <h2 className="text-xl font-semibold text-white">Criar conta</h2>
               <p className="text-center text-sm text-gray-300">
                 Insira seus dados para criar a conta
               </p>
             </div>
 
-            {/* Formulário */}
             <form
               className="space-y-4"
               onSubmit={(e) => {
@@ -164,7 +174,6 @@ export default function RegisterPage() {
               </Button>
             </form>
 
-            {/* Link de login */}
             <p className="mt-4 text-center text-sm text-gray-400">
               Já tem conta?{" "}
               <Link
