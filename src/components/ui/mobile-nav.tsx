@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useMemo } from "react";
 import clsx from "clsx";
 import { motion, AnimatePresence } from "framer-motion";
-import { Home, List, Bot, GraduationCap, User, Plus } from "lucide-react";
+import { Home, List, Puzzle, GraduationCap, User, Plus } from "lucide-react";
 import type * as React from "react";
 
 const ACTIVE = "#268bff";
@@ -21,7 +21,7 @@ export type NavItem = {
 const DEFAULT_ITEMS: NavItem[] = [
   { label: "Inicio", href: "/dashboard", icon: Home },
   { label: "Contas", href: "/accounts", icon: List },
-  { label: "IA", href: "/agents", icon: Bot },
+  { label: "Features", href: "/features", icon: Puzzle }, // atualizado
   { label: "Educacional", href: "/courses", icon: GraduationCap },
   { label: "Perfil", href: "/user-profile", icon: User },
 ];
@@ -56,7 +56,7 @@ export default function MobileNav({
       aria-label="Menu inferior"
       className={clsx(
         "fixed inset-x-0 bottom-0 z-50 -mb-px",
-        "pb-[calc(env(safe-area-inset-bottom))]",
+        "pb-[calc(env(safe-area-inset-bottom)+1.25rem)]",
         className
       )}
     >

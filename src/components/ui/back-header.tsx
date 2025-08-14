@@ -1,25 +1,25 @@
 "use client";
 
-import { ReactNode, useCallback, MouseEvent } from "react";
+import { ReactNode, MouseEvent } from "react";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { useRouter } from "next/navigation";
+import { useSmartBack } from "@/lib/useSmartBack";
 
 interface BackHeaderProps {
-  backHref?: string;          // (compat) se informado, sempre navega para esse href
-  backLabel?: string;         // (compat) ignorado visualmente; usamos só o ícone
-  fallbackHref?: string;      // fallback quando não houver histórico (padrão: /dashboard)
+  backHref?: string;
+  backLabel?: string;
+  fallbackHref?: string;
   title?: string;
-  rightSlot?: ReactNode;      // ícones/botões no canto direito
+  rightSlot?: ReactNode;
   className?: string;
-  sticky?: boolean;           // deixa colado no topo
-  withBorder?: boolean;       // borda inferior opcional
+  sticky?: boolean;
+  withBorder?: boolean;
 }
 
 export function BackHeader({
   backHref,
-  backLabel, // mantido apenas por compatibilidade
+  backLabel,
   fallbackHref = "/dashboard",
   title,
   rightSlot,
@@ -27,26 +27,19 @@ export function BackHeader({
   sticky = true,
   withBorder = true,
 }: BackHeaderProps) {
-  const router = useRouter();
+  const smartBack = useSmartBack(fallbackHref);
 
-  const handleBack = useCallback(
-    (e?: MouseEvent) => {
-      e?.preventDefault();
+  const handleBack = (e?: MouseEvent) => {
+    e?.preventDefault();
 
-      // compat: se o dev passou backHref, priorizamos ele
-      if (backHref) {
-        router.push(backHref);
-        return;
-      }
+    // Prioriza `backHref`, se definido
+    if (backHref) {
+      window.location.href = backHref;
+      return;
+    }
 
-      const canGoBack =
-        typeof window !== "undefined" && window.history.length > 1;
-
-      if (canGoBack) router.back();
-      else router.push(fallbackHref);
-    },
-    [backHref, fallbackHref, router]
-  );
+    smartBack();
+  };
 
   return (
     <header
@@ -60,11 +53,8 @@ export function BackHeader({
       role="banner"
     >
       <div className="mx-auto w-full max-w-7xl">
-        {/* Linha do header */}
         <div className="relative flex h-14 items-center justify-center overflow-visible">
-          {/* Botão de voltar colado na borda (respeita safe area) */}
           <Button
-            // não usar size="icon" para não centralizar o ícone
             variant="ghost"
             onClick={handleBack}
             aria-label={backLabel ?? "Voltar"}
@@ -78,14 +68,12 @@ export function BackHeader({
             <ArrowLeft className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
           </Button>
 
-          {/* Título central (opcional) */}
-          {title ? (
+          {title && (
             <h1 className="pointer-events-none select-none text-base font-semibold tracking-tight text-foreground sm:text-lg">
               <span className="line-clamp-1">{title}</span>
             </h1>
-          ) : null}
+          )}
 
-          {/* Ações à direita (espelha safe area) */}
           <div
             className="absolute right-0 top-0 flex h-14 items-center gap-2 pr-0"
             style={{ paddingRight: "max(env(safe-area-inset-right), 0px)" }}

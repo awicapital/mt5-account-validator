@@ -35,27 +35,56 @@ export default function LoginPage() {
     };
   }, []);
 
-  useEffect(() => {
-    const checkSession = async () => {
-      const { data } = await supabase.auth.getSession();
-      if (data.session) router.push("/dashboard");
-    };
-    checkSession();
-  }, [router]);
-
   const handleLogin = async () => {
     setLoading(true);
+
     if (!email || !senha) {
       toast.error("Preencha todos os campos.");
       setLoading(false);
       return;
     }
-    const { error } = await supabase.auth.signInWithPassword({ email, password: senha });
-    if (error) toast.error(error.message);
-    else {
-      toast.success("Login realizado!");
-      router.push("/dashboard");
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password: senha,
+    });
+
+    console.log("🔐 Login:", { session: data?.session, error });
+
+    if (error) {
+      toast.error(error.message);
+      setLoading(false);
+      return;
     }
+
+    toast.success("Login realizado!");
+
+    // ✅ 1. Pega o usuário logado
+    const { data: userData } = await supabase.auth.getUser();
+    const user = userData?.user;
+
+    if (user?.email) {
+      // ✅ 2. Verifica se já existe um perfil com esse email
+      const { data: existingProfile, error: profileError } = await supabase
+        .from("users")
+        .select("id")
+        .eq("email", user.email)
+        .maybeSingle();
+
+      // ✅ 3. Se não existir, cria novo perfil
+      if (!existingProfile && !profileError) {
+        await supabase.from("users").insert({
+          id: user.id,
+          email: user.email,
+          full_name: user.user_metadata?.name || "Sem nome",
+          access_level: "user",
+          avatar_url: user.user_metadata?.avatar_url || null,
+        });
+      }
+    }
+
+    // ✅ 4. Redireciona
+    router.push("/dashboard");
     setLoading(false);
   };
 
@@ -65,11 +94,17 @@ export default function LoginPage() {
     if (isMobile) {
       window.location.href = "discord://";
       setTimeout(async () => {
-        const { error } = await supabase.auth.signInWithOAuth({ provider: "discord", options: { redirectTo } });
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: "discord",
+          options: { redirectTo },
+        });
         if (error) toast.error("Erro ao entrar com Discord: " + error.message);
       }, 800);
     } else {
-      const { error } = await supabase.auth.signInWithOAuth({ provider: "discord", options: { redirectTo } });
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "discord",
+        options: { redirectTo },
+      });
       if (error) toast.error("Erro ao entrar com Discord: " + error.message);
     }
   };
@@ -102,13 +137,7 @@ export default function LoginPage() {
         <Card className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl shadow-lg">
           <CardContent className="px-8 py-10 space-y-6">
             <div className="flex justify-center">
-              <Image
-                src="/logo_extendida.png"
-                alt="Logo AWI Club"
-                width={200}
-                height={60}
-                priority
-              />
+              <Image src="/logo_extendida.png" alt="Logo AWI Club" width={200} height={60} priority />
             </div>
 
             <h2 className="text-xl font-semibold text-white text-center">Olá! Acesse sua conta</h2>
@@ -171,14 +200,7 @@ export default function LoginPage() {
             <div className="pt-6">
               <Button
                 onClick={handleDiscordLogin}
-                className="
-                  flex items-center justify-center gap-2
-                  w-full py-2
-                  bg-[#5865F2]/20 backdrop-blur-sm
-                  border border-[#5865F2]/50
-                  text-white font-semibold rounded-lg shadow-md
-                  hover:bg-[#5865F2]/30 transition-all duration-200
-                "
+                className="flex items-center justify-center gap-2 w-full py-2 bg-[#5865F2]/20 backdrop-blur-sm border border-[#5865F2]/50 text-white font-semibold rounded-lg shadow-md hover:bg-[#5865F2]/30 transition-all duration-200"
               >
                 <FaDiscord size={20} color="#FFF" />
                 {isMobile ? "Entrar com app do Discord" : "Entrar com Discord"}
@@ -198,7 +220,6 @@ export default function LoginPage() {
       {/* Modal de recuperação de senha */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
         <DialogContent className="bg-[#0f172a] border border-[#1e293b] text-white rounded-2xl shadow-xl">
-
           <DialogHeader>
             <DialogTitle className="text-white text-lg">🔐 Recuperar senha</DialogTitle>
           </DialogHeader>
