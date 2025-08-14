@@ -26,7 +26,7 @@ const getCategory = (name: string) => {
   return "Outros";
 };
 
-const categoryIcons: Record<string, JSX.Element> = {
+const categoryIcons = {
   "Expert Advisors": <Code2 className="w-5 h-5 text-pink-400" />,
   Sets: <Settings2 className="w-5 h-5 text-amber-400" />,
   Copiers: <Puzzle className="w-5 h-5 text-green-400" />,
