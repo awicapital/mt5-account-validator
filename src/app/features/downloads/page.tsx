@@ -2,9 +2,8 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { DownloadCloud, Activity, ArrowLeft } from "lucide-react";
+import { DownloadCloud } from "lucide-react";
 import { createClient } from "@supabase/supabase-js";
-import { BackHeader } from "@/components/ui/back-header";
 
 const categories = ["Experts", "Sets", "Copiers", "Scripts", "Tools"] as const;
 export type Category = typeof categories[number];
@@ -17,7 +16,7 @@ export type DownloadItem = {
 };
 export type FilesByCategory = Record<Category, DownloadItem[]>;
 
-const categoryIcons: Record<Category, JSX.Element> = {
+const categoryIcons: Record<Category, React.ReactNode> = {
   Experts: <span className="text-xl">👨‍💻</span>,
   Sets: <span className="text-xl">🧩</span>,
   Copiers: <span className="text-xl">📎</span>,
@@ -99,23 +98,6 @@ export default function DownloadsPage() {
 
   return (
     <main className="mx-auto max-w-6xl px-6 py-12">
-      <BackHeader title="Downloads">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => history.back()}
-            className="flex items-center gap-2 rounded-full border border-border bg-background/50 px-4 py-2 text-sm text-foreground hover:bg-background"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Voltar
-          </button>
-
-          <div className="flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-4 py-2 text-xs font-medium text-emerald-400">
-            <Activity className="h-3 w-3 animate-pulse" />
-            {loading ? "Carregando arquivos..." : "Atualização automática ativada"}
-          </div>
-        </div>
-      </BackHeader>
-
       {error && (
         <div className="mb-6 rounded-lg border border-red-400/30 bg-red-400/10 p-4 text-sm text-red-200">
           {error}
