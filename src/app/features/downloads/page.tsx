@@ -1,118 +1,186 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { DownloadCloud, Activity, ArrowLeft } from "lucide-react";
 import { createClient } from "@supabase/supabase-js";
-import { Download, Code2, Settings2, Puzzle, Wrench, TerminalSquare } from "lucide-react";
 import { BackHeader } from "@/components/ui/back-header";
-import { Pill } from "@/components/ui/pill";
-import { Button } from "@/components/ui/button";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+const categories = ["Experts", "Sets", "Copiers", "Scripts", "Tools"] as const;
+export type Category = typeof categories[number];
 
-type FileItem = {
+export type DownloadItem = {
   name: string;
-  url: string;
+  href: string;
+  size?: string;
+  description?: string;
+};
+export type FilesByCategory = Record<Category, DownloadItem[]>;
+
+const categoryIcons: Record<Category, JSX.Element> = {
+  Experts: <span className="text-xl">👨‍💻</span>,
+  Sets: <span className="text-xl">🧩</span>,
+  Copiers: <span className="text-xl">📎</span>,
+  Scripts: <span className="text-xl">📜</span>,
+  Tools: <span className="text-xl">🛠️</span>,
 };
 
-const getCategory = (name: string) => {
-  if (name.startsWith("ea_")) return "Expert Advisors";
-  if (name.startsWith("set_")) return "Sets";
-  if (name.startsWith("copier_")) return "Copiers";
-  if (name.startsWith("script_")) return "Scripts";
-  if (name.startsWith("tool_")) return "Tools";
-  return "Outros";
-};
-
-const categoryIcons = {
-  "Expert Advisors": <Code2 className="w-5 h-5 text-pink-400" />,
-  Sets: <Settings2 className="w-5 h-5 text-amber-400" />,
-  Copiers: <Puzzle className="w-5 h-5 text-green-400" />,
-  Scripts: <TerminalSquare className="w-5 h-5 text-cyan-400" />,
-  Tools: <Wrench className="w-5 h-5 text-indigo-400" />,
-  Outros: <Download className="w-5 h-5 text-white" />,
-};
+function formatBytes(bytes?: number): string | undefined {
+  if (!bytes && bytes !== 0) return undefined;
+  const kb = bytes / 1024;
+  if (kb < 1024) return `${kb.toFixed(1)} KB`;
+  const mb = kb / 1024;
+  return `${mb.toFixed(2)} MB`;
+}
 
 export default function DownloadsPage() {
-  const [filesByCategory, setFilesByCategory] = useState<Record<string, FileItem[]>>({});
-  const [loading, setLoading] = useState(true);
-  const [errorMsg, setErrorMsg] = useState("");
-
-  useEffect(() => {
-    const loadFiles = async () => {
-      try {
-        const { data, error } = await supabase.storage.from("downloads").list("", {
-          limit: 100,
-          offset: 0,
-          sortBy: { column: "name", order: "asc" },
-        });
-
-        if (error) throw new Error(error.message);
-        if (!data || data.length === 0) {
-          setErrorMsg("Nenhum arquivo disponível para download.");
-          setLoading(false);
-          return;
-        }
-
-        const grouped: Record<string, FileItem[]> = {};
-
-        for (const file of data) {
-          const { data: publicUrlData } = supabase.storage.from("downloads").getPublicUrl(file.name);
-          const category = getCategory(file.name);
-          if (!grouped[category]) grouped[category] = [];
-          grouped[category].push({ name: file.name, url: publicUrlData.publicUrl });
-        }
-
-        setFilesByCategory(grouped);
-        setLoading(false);
-      } catch (err: any) {
-        console.error("Erro ao carregar arquivos:", err.message);
-        setErrorMsg("Erro ao carregar os arquivos.");
-        setLoading(false);
-      }
-    };
-
-    loadFiles();
+  const supabase = useMemo(() => {
+    return createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
   }, []);
 
+  const [files, setFiles] = useState<FilesByCategory>({
+    Experts: [],
+    Sets: [],
+    Copiers: [],
+    Scripts: [],
+    Tools: [],
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const updates: Partial<FilesByCategory> = {};
+        await Promise.all(
+          categories.map(async (category) => {
+            const { data, error } = await supabase.storage
+              .from("downloads")
+              .list(category, {
+                limit: 200,
+                sortBy: { column: "name", order: "asc" },
+              });
+            if (error) throw error;
+
+            const items: DownloadItem[] = (data ?? []).map((f) => {
+              const { data: publicData } = supabase.storage
+                .from("downloads")
+                .getPublicUrl(`${category}/${f.name}`);
+              const size = formatBytes(
+                (f as any)?.metadata?.size ?? (f as any)?.metadata?.contentLength
+              );
+              return {
+                name: f.name,
+                href: publicData.publicUrl,
+                size,
+              };
+            });
+            (updates as any)[category] = items;
+          })
+        );
+        if (active)
+          setFiles((prev) => ({ ...prev, ...(updates as FilesByCategory) }));
+      } catch (e: any) {
+        if (active) setError(e?.message ?? "Erro ao carregar arquivos");
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [supabase]);
+
   return (
-    <div className="min-h-[100dvh] bg-[#03182f] text-white pb-24">
-      <div className="sticky top-0 z-40 bg-[#03182f]/80 backdrop-blur-md">
-        <div className="mx-auto max-w-6xl pt-2">
-          <BackHeader backHref="/" backLabel="Voltar" className="border-b border-white/10 text-white" />
-          <Pill dotColor="bg-pink-500">Downloads</Pill>
+    <main className="mx-auto max-w-6xl px-6 py-12">
+      <BackHeader title="Downloads">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => history.back()}
+            className="flex items-center gap-2 rounded-full border border-border bg-background/50 px-4 py-2 text-sm text-foreground hover:bg-background"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Voltar
+          </button>
+
+          <div className="flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-4 py-2 text-xs font-medium text-emerald-400">
+            <Activity className="h-3 w-3 animate-pulse" />
+            {loading ? "Carregando arquivos..." : "Atualização automática ativada"}
+          </div>
         </div>
-      </div>
+      </BackHeader>
 
-      <main className="mx-auto max-w-6xl pt-8 px-4">
-        <h1 className="text-2xl font-bold mb-6">Arquivos para download</h1>
+      {error && (
+        <div className="mb-6 rounded-lg border border-red-400/30 bg-red-400/10 p-4 text-sm text-red-200">
+          {error}
+        </div>
+      )}
 
-        {loading && <p className="text-white/60">Carregando arquivos...</p>}
-        {errorMsg && <p className="text-red-400">{errorMsg}</p>}
-
-        {!loading && Object.keys(filesByCategory).map((category) => (
-          <section key={category} className="mb-10">
-            <div className="flex items-center gap-2 mb-3">
-              {categoryIcons[category]}
-              <h2 className="text-lg font-semibold text-white">{category}</h2>
+      <div className="space-y-20">
+        {categories.map((category) => (
+          <section key={category} className="space-y-6">
+            <div className="flex items-center gap-4">
+              <div className="flex h-14 w-14 items-center justify-center rounded-3xl bg-gradient-to-br from-white/10 to-white/5 shadow-inner">
+                {categoryIcons[category]}
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-white tracking-tight">
+                  {category}
+                </h2>
+                <p className="text-sm text-white/60">
+                  {files[category].length} arquivo(s) disponível(is)
+                </p>
+              </div>
             </div>
-            <ul className="space-y-3">
-              {filesByCategory[category].map((file) => (
-                <li key={file.name} className="flex items-center justify-between bg-white/5 p-4 rounded-xl">
-                  <span className="truncate text-white/90">{file.name}</span>
-                  <Button variant="secondary" asChild>
-                    <a href={file.url} download target="_blank" rel="noopener noreferrer">
-                      <Download className="mr-2 h-4 w-4" /> Baixar
-                    </a>
-                  </Button>
-                </li>
-              ))}
-            </ul>
+
+            {files[category].length === 0 ? (
+              <p className="text-sm italic text-white/50">
+                Nenhum arquivo disponível nesta categoria.
+              </p>
+            ) : (
+              <ul className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                {files[category].map((item) => {
+                  const ext = item.name.split(".").pop()?.toLowerCase();
+                  return (
+                    <li
+                      key={item.href}
+                      className="group relative flex flex-col justify-between overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-white/5 to-white/0 p-5 shadow-md transition hover:scale-[1.015] hover:shadow-xl"
+                    >
+                      <div className="flex-1 space-y-2">
+                        <p className="truncate text-lg font-medium text-white" title={item.name}>
+                          {item.name}
+                        </p>
+                        <div className="flex items-center gap-2 text-xs text-white/50">
+                          {item.size && <span>{item.size}</span>}
+                          {ext && (
+                            <span className="rounded-md border border-white/10 bg-white/10 px-2 py-0.5 uppercase tracking-wider">
+                              .{ext}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <Link
+                        href={item.href}
+                        prefetch={false}
+                        className="mt-4 inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-sm text-white transition hover:bg-white/20"
+                      >
+                        <DownloadCloud className="h-4 w-4" />
+                        Baixar
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </section>
         ))}
-      </main>
-    </div>
+      </div>
+    </main>
   );
 }
