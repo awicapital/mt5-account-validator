@@ -1,4 +1,4 @@
-import useSWR from "swr";
+import useSWR, { mutate as globalMutate } from "swr";
 import { supabase } from "@/lib/supabase";
 
 export interface Post {
@@ -67,8 +67,9 @@ export const usePosts = () => {
   };
 };
 
+// ✅ Corrigido: usa mutate global corretamente
 export const mutatePosts = () => {
-  return useSWR.mutate("posts");
+  return globalMutate("posts");
 };
 
 export { fetchPosts };
