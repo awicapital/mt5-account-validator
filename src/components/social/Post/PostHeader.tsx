@@ -38,6 +38,7 @@ function PostCardBase({ post, withReplyBox = false, className = "" }: PostCardPr
 
       {/* Post Body */}
       <div className="flex-1 min-w-0">
+        <PostHeader />
         <div className="flex items-center gap-1 text-sm text-muted-foreground">
           <span className="font-semibold text-foreground">{post.user.name}</span>
           <span className="text-muted-foreground">@{post.user.handle}</span>
