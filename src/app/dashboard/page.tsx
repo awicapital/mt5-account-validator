@@ -13,6 +13,7 @@ import PostCard from "@/components/social/PostCard";
 import { PostComposer } from "@/components/social/PostComposer";
 import { Pill } from "@/components/ui/pill";
 import { usePosts } from "@/lib/usePosts";
+import type { Post } from "@/lib/usePosts"; 
 
 dayjs.locale("pt-br");
 
@@ -28,7 +29,7 @@ export default function DashboardMPage() {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [visibility, setVisibility] = useState("public");
   const [showPostCard, setShowPostCard] = useState(false);
-  const [replyTo, setReplyTo] = useState(null);
+  const [replyTo, setReplyTo] = useState<Post | null>(null);
   const [dailyPnls, setDailyPnls] = useState<DailyPnL[]>([]);
   const [balance, setBalance] = useState<number>(0);
   const [monthlyGrowthPercent, setMonthlyGrowthPercent] = useState<number>(0);
