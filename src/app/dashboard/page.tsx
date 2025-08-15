@@ -2,15 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, CalendarDays } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import dayjs from "dayjs";
 import "dayjs/locale/pt-br";
 
 import { supabase } from "@/lib/supabase";
 import { fetchAccountsData, Trade } from "@/lib/accountsData";
 import type { DailyPnL } from "@/components/ui/dashboard-calendar";
-import { DashboardCalendar } from "@/components/ui/dashboard-calendar";
 import { DashboardPnLCard } from "@/components/ui/dashboard-pnl-card";
+// import { DashboardCalendar } from "@/components/ui/dashboard-calendar";
 
 dayjs.locale("pt-br");
 
@@ -128,7 +128,6 @@ export default function DashboardMPage() {
   return (
     <div className="min-h-[100dvh] bg-[#03182f] pb-[calc(84px+env(safe-area-inset-bottom))] text-white">
       <main className="mx-auto max-w-6xl space-y-6 pt-4 lg:px-8">
-        {/* Card principal de PnL */}
         <div className="relative z-30">
           <DashboardPnLCard
             balance={balance}
@@ -137,12 +136,13 @@ export default function DashboardMPage() {
           />
         </div>
 
-        {/* Calendário */}
+        {/* Calendário removido temporariamente */}
+        {/*
         <section className={`${hasAccountData ? "opacity-100" : "opacity-30"} transition-opacity`}>
           <DashboardCalendar dailyPnls={dailyPnls} trades={allTrades} onDaySelect={setSelectedDay} />
         </section>
+        */}
 
-        {/* Trades do dia selecionado */}
         {selectedDay && (
           <section className="space-y-4">
             {Object.entries(tradesByAccount).length === 0 ? (

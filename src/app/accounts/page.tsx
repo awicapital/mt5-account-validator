@@ -2,17 +2,17 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useSwipeable } from "react-swipeable";
-import { motion, useAnimation, useMotionValue, useTransform } from "framer-motion";
+import { Loader2, Trash2, Plus, Search } from "lucide-react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Loader2, Trash2, Plus, Search } from "lucide-react";
-import { supabase } from "@/lib/supabase";
-import { toast } from "sonner";
 import { AccountCard } from "@/components/ui/account-card";
-import { fetchAccountsData } from "@/lib/accountsData";
 import { BackHeader } from "@/components/ui/back-header";
 import { Pill } from "@/components/ui/pill";
+import { DashboardCalendar } from "@/components/ui/dashboard-calendar";
+import type { DailyPnL } from "@/components/ui/dashboard-calendar";
+import { supabase } from "@/lib/supabase";
+import { fetchAccountsData } from "@/lib/accountsData";
+import { toast } from "sonner";
 
 interface Account {
   id: string;
@@ -24,112 +24,43 @@ interface Account {
   sparkline?: number[];
 }
 
-type SwipeableAccountCardProps = {
-  account: Account;
-  onDelete: () => void;
-  onOpen: () => void;
-};
+function ClickableAccountCard({ account }: { account: Account }) {
+  const router = useRouter();
 
-function SwipeableAccountCard({ account, onDelete, onOpen }: SwipeableAccountCardProps) {
-  const x = useMotionValue(0);
-  const controls = useAnimation();
-  const bgColor = useTransform(
-    x,
-    [-140, 0, 80],
-    ["#7f1d1d", account.is_active ? "#131f35" : "#4d4d1f", account.is_active ? "#131f35" : "#4d4d1f"]
-  );
-  const revealDelete = useTransform(x, [-140, -90, 0], [1, 1, 0]);
-
-  const swipeHandlers = useSwipeable({
-    onSwiping: (e) => {
-      if (e.deltaX < 0) x.set(e.deltaX);
-      if (e.deltaX > 0) x.set(0);
-    },
-    onSwipedLeft: async (e) => {
-      if (e.deltaX < -90) {
-        await controls.start({ x: -160, opacity: 0, transition: { duration: 0.18 } });
-        onDelete();
-        x.set(0);
-        await controls.start({ x: 0, opacity: 1 });
-      } else {
-        await controls.start({ x: -90, transition: { type: "spring", stiffness: 260, damping: 24 } });
-      }
-    },
-    onSwipedRight: () => controls.start({ x: 0, transition: { type: "spring", stiffness: 260, damping: 24 } }),
-    onTap: () => {
-      if (account.is_active) onOpen();
-    },
-    preventScrollOnSwipe: true,
-    trackMouse: true,
-  });
-
-  function handleKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
-    if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault();
-      if (account.is_active) onOpen();
+  const handleClick = () => {
+    if (account.is_active) {
+      router.push(`/accounts-details/${account.account_number}`);
     }
-    if (e.key === "Delete" || e.key === "Backspace") {
-      onDelete();
-    }
-  }
+  };
 
   return (
-    <div className="relative">
-      {/* área vermelha revelada no swipe */}
-      <motion.div
-        aria-hidden
-        style={{ opacity: revealDelete }}
-        className="absolute inset-0 z-0 grid place-items-center rounded-2xl bg-red-900/70"
-      >
-        <div className="flex items-center gap-2 text-sm text-red-200">
-          <Trash2 className="h-4 w-4" /> Deslize para excluir
-        </div>
-      </motion.div>
-
-      <motion.div
-        {...swipeHandlers}
-        onClick={() => account.is_active && onOpen()}
-        onKeyDown={handleKeyDown}
-        role="button"
-        tabIndex={0}
-        whileTap={{ scale: 0.99 }}
-        animate={controls}
-        style={{ x, backgroundColor: bgColor }}
-        className={`relative z-10 overflow-hidden rounded-2xl cursor-pointer
-          focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#268bff]/60 focus:ring-offset-[#03182f]
-          ${account.is_active ? "border-0 bg-transparent" : "border border-yellow-400 bg-yellow-500/20"}`}
-        aria-label={
-          account.is_active
-            ? `Abrir detalhes da conta ${account.account_number}`
-            : `Conta ${account.account_number} pendente de aprovação`
-        }
-      >
-        {account.is_active ? (
-          <AccountCard account={account} className="rounded-2xl" />
-        ) : (
-          <div className="flex h-20 flex-col items-center justify-center gap-1 text-sm font-medium text-yellow-300">
-            <span>Pendente de aprovação</span>
-            <span className="text-xs opacity-80">Conta: {account.account_number}</span>
-          </div>
-        )}
-      </motion.div>
+    <div
+      onClick={handleClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") handleClick();
+      }}
+      className="focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#268bff]/60 focus:ring-offset-[#03182f]"
+    >
+      <AccountCard account={account} />
     </div>
   );
 }
 
 export default function AccountsPage() {
   const router = useRouter();
-
   const [loading, setLoading] = useState(true);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [query, setQuery] = useState("");
-
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
-
   const [requestDialogOpen, setRequestDialogOpen] = useState(false);
   const [accountNumber, setAccountNumber] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [dailyPnls, setDailyPnls] = useState<DailyPnL[]>([]);
+  const [allTrades, setAllTrades] = useState([]);
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     const q = query.trim();
@@ -148,6 +79,17 @@ export default function AccountsPage() {
 
     const { data: accRows, error } = await supabase.from("accounts").select("*").eq("email", user.user.email);
 
+    const accountsData = await fetchAccountsData();
+    setAllTrades(accountsData?.trades || []);
+
+    if (accountsData) {
+      const parsedDaily: DailyPnL[] = Object.entries(accountsData.dailyPnls).map(([date, pnl]) => ({
+        date: date.replaceAll(".", "-"),
+        pnl: typeof pnl === "number" ? pnl : 0,
+      }));
+      setDailyPnls(parsedDaily);
+    }
+
     if (error) {
       toast.error("Erro ao carregar contas");
       setAccounts([]);
@@ -155,22 +97,8 @@ export default function AccountsPage() {
       return;
     }
 
-    const accountsData = await fetchAccountsData();
-    if (!accountsData) {
-      setAccounts(
-        (accRows ?? []).map((acct) => ({
-          ...acct,
-          balance: acct.balance ?? 0,
-          pnl_total: null,
-          sparkline: [],
-        }))
-      );
-      setLoading(false);
-      return;
-    }
-
     const dailyPnlsByAcc: Record<string, Record<string, number>> = {};
-    for (const t of accountsData.trades) {
+    for (const t of accountsData?.trades || []) {
       if (t.type === "deposit") continue;
       const day = t.date.split("T")[0];
       const accId = String(t.accountId);
@@ -210,8 +138,6 @@ export default function AccountsPage() {
     if (!selectedAccount) return;
     setDialogOpen(false);
     const toDelete = selectedAccount;
-
-    // otimista
     setAccounts((prev) => prev.filter((a) => a.id !== toDelete.id));
     try {
       const { error } = await supabase.from("accounts").delete().eq("id", toDelete.id);
@@ -261,57 +187,109 @@ export default function AccountsPage() {
 
   return (
     <div className="min-h-dvh bg-[#03182f] pb-28 text-white">
-      {/* Header fixo */}
       <div className="sticky top-0 z-40 bg-[#03182f]/80 backdrop-blur">
         <div className="mx-auto max-w-5xl">
           <BackHeader
-  backHref="/"
-  backLabel="Voltar"
-  className="bg-transparent border-b border-white/10 text-white"
-  rightSlot={
-    <div className="relative hidden sm:block">
-      <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-white/40" />
-      <input
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder="Buscar por número ou EA"
-        className="w-[220px] rounded-lg border border-white/10 bg-white/5 pl-8 pr-2 py-1.5 text-xs text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/30"
-      />
-    </div>
-  }
-/>
-
-
-          {/* Pill imediatamente abaixo do BackHeader */}
-          <div className="py-2">
-            <Pill dotColor="bg-[#268bff]">Contas</Pill>
-          </div>
+            backHref="/"
+            backLabel="Voltar"
+            className="bg-transparent border-b border-white/10 text-white"
+            rightSlot={
+              <div className="relative hidden sm:block">
+                <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-white/40" />
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Buscar por número ou EA"
+                  className="w-[220px] rounded-lg border border-white/10 bg-white/5 pl-8 pr-2 py-1.5 text-xs text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/30"
+                />
+              </div>
+            }
+          />
         </div>
       </div>
 
       <main className="mx-auto max-w-5xl space-y-6 pt-4">
-        {!accounts.length ? (
-          <div className="mt-10 text-center text-sm text-white/60">Nenhuma conta cadastrada.</div>
-        ) : (
-          <div className="space-y-4">
-            {filtered.map((account) => (
-              <SwipeableAccountCard
-                key={account.id}
-                account={account}
-                onDelete={() => confirmDelete(account)}
-                onOpen={() => router.push(`/accounts-details/${account.account_number}`)}
-              />
-            ))}
-            {filtered.length === 0 && (
-              <p className="rounded-xl border border-white/10 bg-white/5 p-4 text-center text-sm text-white/60">
-                Nada encontrado para &quot;{query}&quot;.
-              </p>
-            )}
-          </div>
+        {dailyPnls.length > 0 && (
+          <section className="sm:px-0">
+            <DashboardCalendar dailyPnls={dailyPnls} trades={allTrades} onDaySelect={setSelectedDay} />
+          </section>
         )}
+
+        {selectedDay && (
+          <section className="space-y-4 sm:px-0">
+            <div className="rounded-2xl border border-white/10 bg-[#0f1b2d]/80 backdrop-blur-sm p-4 shadow-[0_10px_30px_-12px_rgba(0,0,0,0.45)] bg-[radial-gradient(100%_100%_at_0%_0%,rgba(38,139,255,0.12),transparent_40%),radial-gradient(120%_120%_at_100%_0%,rgba(16,185,129,0.06),transparent_50%)]">
+              <div className="mb-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs sm:text-sm font-medium">Dia selecionado</span>
+                  <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] sm:text-[11px] text-white/70">
+                    {selectedDay}
+                  </span>
+                </div>
+                <span className="text-xs sm:text-sm text-white/60">
+                  {allTrades.filter((t) => t.date.split("T")[0] === selectedDay).length} trade(s)
+                </span>
+              </div>
+              <div className="divide-y divide-[#334155]">
+                <div className="grid grid-cols-5 gap-2 pb-2 text-[10px] sm:text-[11px] text-white/50">
+                  <span>Hora</span>
+                  <span>Ativo</span>
+                  <span>Lote</span>
+                  <span className="text-center">Tipo</span>
+                  <span className="text-right">Resultado</span>
+                </div>
+                {allTrades
+                  .filter((t) => t.date.split("T")[0] === selectedDay)
+                  .map((trade) => (
+                    <div key={trade.id} className="grid grid-cols-5 gap-2 py-2 text-[11px] sm:text-xs">
+                      <span className="text-white/70">{new Date(trade.date).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span>
+                      <span className="truncate">{trade.symbol || "---"}</span>
+                      <span>{trade.volume?.toFixed(2)} lot</span>
+                      <span className="flex justify-center">
+                        <span className={`rounded-full border px-1.5 py-0.5 text-[9px] sm:text-[10px] font-semibold ${
+                          trade.type === "buy"
+                            ? "border-emerald-500 bg-emerald-500/15 text-emerald-400"
+                            : "border-rose-500 bg-rose-500/15 text-rose-400"
+                        }`}>
+                          {trade.type.toUpperCase()}
+                        </span>
+                      </span>
+                      <span className={`text-right ${
+                        trade.profit > 0 ? "text-emerald-400" : trade.profit < 0 ? "text-rose-400" : "text-white"
+                      }`}>
+                        {trade.profit.toLocaleString("pt-BR", { style: "currency", currency: "USD" })}
+                      </span>
+                    </div>
+                  ))}
+                {allTrades.filter((t) => t.date.split("T")[0] === selectedDay).length === 0 && (
+                  <div className="py-2 text-center text-sm text-white/60">Nenhum trade registrado para este dia.</div>
+                )}
+              </div>
+            </div>
+          </section>
+        )}
+
+        <div className="sm:px-0">
+          <div className="py-2">
+            <Pill dotColor="bg-[#268bff]">Contas</Pill>
+          </div>
+
+          {!accounts.length ? (
+            <div className="mt-10 text-center text-sm text-white/60">Nenhuma conta cadastrada.</div>
+          ) : (
+            <div className="space-y-4">
+              {filtered.map((account) => (
+                <ClickableAccountCard key={account.id} account={account} />
+              ))}
+              {filtered.length === 0 && (
+                <p className="rounded-xl border border-white/10 bg-white/5 p-4 text-center text-sm text-white/60">
+                  Nada encontrado para &quot;{query}&quot;.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
       </main>
 
-      {/* FAB */}
       <button
         type="button"
         className="fixed bottom-24 right-6 z-50 rounded-full bg-[#268bff] p-4 text-white shadow-lg transition hover:bg-[#1e78e0]"
@@ -321,7 +299,6 @@ export default function AccountsPage() {
         <Plus className="h-5 w-5" />
       </button>
 
-      {/* Dialog de exclusão */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="border border-[#1f2c44] bg-[#131f35]">
           <DialogHeader>
@@ -336,13 +313,14 @@ export default function AccountsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Dialog de solicitação */}
       <Dialog open={requestDialogOpen} onOpenChange={setRequestDialogOpen}>
         <DialogContent className="border border-[#1f2c44] bg-[#131f35]">
           <DialogHeader>
             <DialogTitle className="text-center text-xl text-white">Solicitar nova conta</DialogTitle>
           </DialogHeader>
-          <p className="mt-1 mb-5 text-center text-sm text-white/70">Informe o número da conta MT5 que deseja vincular.</p>
+          <p className="mt-1 mb-5 text-center text-sm text-white/70">
+            Informe o número da conta MT5 que deseja vincular.
+          </p>
           <div className="space-y-2">
             <input
               type="tel"

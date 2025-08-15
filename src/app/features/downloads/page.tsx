@@ -2,27 +2,23 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { DownloadCloud } from "lucide-react";
+import { DownloadCloud, ChevronDown } from "lucide-react";
 import { createClient } from "@supabase/supabase-js";
+import clsx from "clsx";
+import { BackHeader } from "@/components/ui/back-header";
+import { Pill } from "@/components/ui/pill";
 
 const categories = ["Experts", "Sets", "Copiers", "Scripts", "Tools"] as const;
-export type Category = typeof categories[number];
+type Category = typeof categories[number];
 
-export type DownloadItem = {
+interface DownloadItem {
   name: string;
   href: string;
   size?: string;
   description?: string;
-};
-export type FilesByCategory = Record<Category, DownloadItem[]>;
+}
 
-const categoryIcons: Record<Category, React.ReactNode> = {
-  Experts: <span className="text-xl">👨‍💻</span>,
-  Sets: <span className="text-xl">🧩</span>,
-  Copiers: <span className="text-xl">📎</span>,
-  Scripts: <span className="text-xl">📜</span>,
-  Tools: <span className="text-xl">🛠️</span>,
-};
+type FilesByCategory = Record<Category, DownloadItem[]>;
 
 function formatBytes(bytes?: number): string | undefined {
   if (!bytes && bytes !== 0) return undefined;
@@ -31,6 +27,14 @@ function formatBytes(bytes?: number): string | undefined {
   const mb = kb / 1024;
   return `${mb.toFixed(2)} MB`;
 }
+
+const categoryIcons: Record<Category, JSX.Element> = {
+  Experts: <span className="text-xl">⚡</span>,
+  Sets: <span className="text-xl">⚙️</span>,
+  Copiers: <span className="text-xl">📄</span>,
+  Scripts: <span className="text-xl">💻</span>,
+  Tools: <span className="text-xl">🛠️</span>,
+};
 
 export default function DownloadsPage() {
   const supabase = useMemo(() => {
@@ -47,27 +51,23 @@ export default function DownloadsPage() {
     Scripts: [],
     Tools: [],
   });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<Partial<Record<Category, boolean>>>({});
 
   useEffect(() => {
     let active = true;
     (async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const updates: Partial<FilesByCategory> = {};
-        await Promise.all(
-          categories.map(async (category) => {
-            const { data, error } = await supabase.storage
-              .from("downloads")
-              .list(category, {
-                limit: 200,
-                sortBy: { column: "name", order: "asc" },
-              });
-            if (error) throw error;
+      const updates: Partial<FilesByCategory> = {};
+      await Promise.all(
+        categories.map(async (category) => {
+          const { data, error } = await supabase.storage
+            .from("downloads")
+            .list(category, {
+              limit: 200,
+              sortBy: { column: "name", order: "asc" },
+            });
 
-            const items: DownloadItem[] = (data ?? []).map((f) => {
+          if (!error && data) {
+            const items: DownloadItem[] = data.map((f) => {
               const { data: publicData } = supabase.storage
                 .from("downloads")
                 .getPublicUrl(`${category}/${f.name}`);
@@ -78,18 +78,14 @@ export default function DownloadsPage() {
                 name: f.name,
                 href: publicData.publicUrl,
                 size,
+                description: f.name,
               };
             });
             (updates as any)[category] = items;
-          })
-        );
-        if (active)
-          setFiles((prev) => ({ ...prev, ...(updates as FilesByCategory) }));
-      } catch (e: any) {
-        if (active) setError(e?.message ?? "Erro ao carregar arquivos");
-      } finally {
-        if (active) setLoading(false);
-      }
+          }
+        })
+      );
+      if (active) setFiles((prev) => ({ ...prev, ...(updates as FilesByCategory) }));
     })();
     return () => {
       active = false;
@@ -97,71 +93,94 @@ export default function DownloadsPage() {
   }, [supabase]);
 
   return (
-    <main className="mx-auto max-w-6xl px-6 py-12">
-      {error && (
-        <div className="mb-6 rounded-lg border border-red-400/30 bg-red-400/10 p-4 text-sm text-red-200">
-          {error}
-        </div>
-      )}
+    <main className="min-h-screen bg-[#03182f] py-8 text-white md:px-6">
+      <div className="mx-auto max-w-6xl space-y-6">
+        <BackHeader
+          backHref="/features"
+          backLabel="Voltar"
+          className="border-b border-white/10 text-white"
+        />
+        <Pill dotColor="bg-sky-500">Downloads</Pill>
 
-      <div className="space-y-20">
-        {categories.map((category) => (
-          <section key={category} className="space-y-6">
-            <div className="flex items-center gap-4">
-              <div className="flex h-14 w-14 items-center justify-center rounded-3xl bg-gradient-to-br from-white/10 to-white/5 shadow-inner">
-                {categoryIcons[category]}
-              </div>
-              <div>
-                <h2 className="text-2xl font-bold text-white tracking-tight">
-                  {category}
-                </h2>
-                <p className="text-sm text-white/60">
-                  {files[category].length} arquivo(s) disponível(is)
-                </p>
-              </div>
-            </div>
+        <div className="space-y-4">
+          {categories.map((category) => (
+            <div
+              key={category}
+              className="rounded-xl border border-white/10 bg-white/5 shadow-sm"
+            >
+              <button
+                onClick={() =>
+                  setExpanded((prev) => ({
+                    ...prev,
+                    [category]: !prev[category],
+                  }))
+                }
+                className="flex w-full items-center justify-between rounded-t-xl px-4 py-3 transition hover:bg-white/10"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-md bg-white/10">
+                    {categoryIcons[category]}
+                  </div>
+                  <div className="text-left">
+                    <p className="text-sm font-medium text-white">{category}</p>
+                    <p className="text-xs text-white/50">
+                      {files[category].length} arquivo(s)
+                    </p>
+                  </div>
+                </div>
+                <ChevronDown
+                  className={clsx(
+                    "h-4 w-4 text-white/70 transition-transform duration-300",
+                    expanded[category] && "rotate-180"
+                  )}
+                />
+              </button>
 
-            {files[category].length === 0 ? (
-              <p className="text-sm italic text-white/50">
-                Nenhum arquivo disponível nesta categoria.
-              </p>
-            ) : (
-              <ul className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                {files[category].map((item) => {
-                  const ext = item.name.split(".").pop()?.toLowerCase();
-                  return (
-                    <li
-                      key={item.href}
-                      className="group relative flex flex-col justify-between overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-white/5 to-white/0 p-5 shadow-md transition hover:scale-[1.015] hover:shadow-xl"
-                    >
-                      <div className="flex-1 space-y-2">
-                        <p className="truncate text-lg font-medium text-white" title={item.name}>
-                          {item.name}
-                        </p>
-                        <div className="flex items-center gap-2 text-xs text-white/50">
-                          {item.size && <span>{item.size}</span>}
-                          {ext && (
-                            <span className="rounded-md border border-white/10 bg-white/10 px-2 py-0.5 uppercase tracking-wider">
-                              .{ext}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <Link
-                        href={item.href}
-                        prefetch={false}
-                        className="mt-4 inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-sm text-white transition hover:bg-white/20"
+              {expanded[category] && files[category].length > 0 && (
+                <ul className="divide-y divide-white/10 border-t border-white/10 bg-transparent text-sm">
+                  {files[category].map((item) => {
+                    const ext = item.name.split(".").pop()?.toUpperCase();
+                    return (
+                      <li
+                        key={item.href}
+                        className="flex items-center justify-between gap-3 px-4 py-2 hover:bg-white/10"
                       >
-                        <DownloadCloud className="h-4 w-4" />
-                        Baixar
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </section>
-        ))}
+                        <div className="flex flex-col overflow-hidden">
+                          <span className="truncate text-sm font-medium text-white">
+                            {item.description}
+                          </span>
+                          <span className="truncate text-xs text-white/50">
+                            {item.name}
+                          </span>
+                          <div className="mt-1 flex gap-2 text-[10px] text-white/60">
+                            {item.size && (
+                              <span className="rounded bg-white/10 px-2 py-0.5">
+                                {item.size}
+                              </span>
+                            )}
+                            {ext && (
+                              <span className="rounded bg-white/10 px-2 py-0.5">
+                                .{ext}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <Link
+                          href={item.href}
+                          prefetch={false}
+                          className="shrink-0 rounded-md border border-white/10 bg-white/10 px-3 py-1 text-xs text-white hover:bg-white/20"
+                          aria-label={`Download ${item.name}`}
+                        >
+                          Baixar
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          ))}
+        </div>
       </div>
     </main>
   );

@@ -1,4 +1,3 @@
-// src/components/ui/dashboard-calendar.tsx
 "use client";
 
 import dayjs, { Dayjs } from "dayjs";
@@ -113,13 +112,11 @@ export function DashboardCalendar({
   const today = dayjs();
   const [showMonthPicker, setShowMonthPicker] = useState(false);
 
-  // mapa date → pnl
   const pnlMap = useMemo(
     () => new Map(dailyPnls.map((d) => [d.date, d.pnl])),
     [dailyPnls]
   );
 
-  // build months array
   const months = useMemo(() => {
     if (dailyPnls.length === 0) return [today.format("YYYY-MM")];
     const minDate = dayjs(
@@ -128,7 +125,6 @@ export function DashboardCalendar({
     return getMonthsRange(minDate, today);
   }, [dailyPnls, today]);
 
-  // estado com índice e direção para animação
   const [currentMonthIndex, setCurrentMonthIndex] = useState(() => months.length - 1);
   const [direction, setDirection] = useState(0);
 
@@ -139,7 +135,6 @@ export function DashboardCalendar({
 
   const currentMonth = dayjs(months[currentMonthIndex]);
 
-  // grid de days
   const startOfMonth = currentMonth.startOf("month").startOf("week");
   const endOfMonth = currentMonth.endOf("month").endOf("week");
   const days: Dayjs[] = [];
@@ -149,7 +144,6 @@ export function DashboardCalendar({
     date = date.add(1, "day");
   }
 
-  // totais do mês
   const monthTotal = days.reduce((sum, d) => {
     if (!d.isSame(currentMonth, "month")) return sum;
     return sum + (pnlMap.get(d.format("YYYY-MM-DD")) ?? 0);
@@ -161,7 +155,6 @@ export function DashboardCalendar({
       ? "text-[#ef4444]"
       : "text-white";
 
-  // variantes customizadas para enter/exit
   const variants: Variants = {
     enter: (dir: number) => ({ opacity: 0, x: dir > 0 ? 50 : -50 }),
     center: { opacity: 1, x: 0 },
@@ -183,7 +176,6 @@ export function DashboardCalendar({
     }
   }
 
-  // seleção de dia
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const onClickDay = (key: string, hasPnl: boolean) => {
     if (!hasPnl) return;
@@ -194,25 +186,22 @@ export function DashboardCalendar({
 
   return (
     <div className="w-full">
-      <div className="rounded-xl py-4 bg-[#03182f] text-white max-w-6xl mx-auto px-0 relative">
-        {/* Header */}
-<div className="flex items-center justify-between mb-4">
-  <Pill>Calendário</Pill>
+      <Pill className="mb-3">Calendário</Pill>
+      <div className="rounded-2xl border border-white/10 bg-[#0f1b2d]/80 backdrop-blur-sm shadow-[0_10px_30px_-12px_rgba(0,0,0,0.45)] bg-[radial-gradient(100%_100%_at_0%_0%,rgba(38,139,255,0.12),transparent_40%),radial-gradient(120%_120%_at_100%_0%,rgba(16,185,129,0.06),transparent_50%)] text-white max-w-6xl mx-auto px-5 py-4 relative">
+        <div className="flex items-center justify-end mb-4">
+          <div className="flex flex-col items-end">
+            <button
+              onClick={() => setShowMonthPicker((v) => !v)}
+              className="text-sm font-medium text-white hover:underline"
+            >
+              {currentMonth.format("MM/YY")}
+            </button>
+            <span className={`text-xs mt-1 font-medium ${totalColor}`}>
+              Resultado: {formatPnl(monthTotal)}
+            </span>
+          </div>
+        </div>
 
-  <div className="flex flex-col items-end">
-    <button
-      onClick={() => setShowMonthPicker((v) => !v)}
-      className="text-sm font-medium text-white hover:underline"
-    >
-      {currentMonth.format("MM/YY")}
-    </button>
-    <span className={`text-xs mt-1 font-medium ${totalColor}`}>
-      Resultado: {formatPnl(monthTotal)}
-    </span>
-  </div>
-</div>
-
-        {/* Month Picker */}
         {showMonthPicker && (
           <MonthYearSelect
             months={months}
@@ -222,14 +211,12 @@ export function DashboardCalendar({
           />
         )}
 
-        {/* Weekdays */}
-        <div className="grid grid-cols-7 gap-2 text-center text-xs text-[#94a3b8] mb-2">
+        <div className="grid grid-cols-7 gap-2 text-center text-[10px] tracking-wide text-white/60 font-semibold uppercase mb-2">
           {daysOfWeek.map((dow, i) => (
             <div key={i}>{dow}</div>
           ))}
         </div>
 
-        {/* Calendar Grid */}
         <AnimatePresence initial={false} custom={direction} mode="wait">
           <motion.div
             key={currentMonthIndex}
