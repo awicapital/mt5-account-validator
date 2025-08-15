@@ -30,7 +30,7 @@ const Post = memo(({ post, onLike, onReply }: PostProps) => {
 
   return (
     <Card className="w-full max-w-xl mx-auto mb-4 p-4 rounded-2xl shadow-sm">
-      <PostHeader post={post} />
+      <PostHeader user={post.user} createdAt={post.createdAt} />
       <PostContent content={post.content} />
       <PostActions likes={post.likes} onLike={handleLike} />
       <PostReply onReply={handleReply} />
