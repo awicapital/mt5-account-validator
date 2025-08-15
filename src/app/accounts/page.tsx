@@ -13,6 +13,7 @@ import type { DailyPnL } from "@/components/ui/dashboard-calendar";
 import { supabase } from "@/lib/supabase";
 import { fetchAccountsData } from "@/lib/accountsData";
 import { toast } from "sonner";
+import type { Trade } from "@/lib/accountsData";
 
 interface Account {
   id: string;
@@ -59,7 +60,7 @@ export default function AccountsPage() {
   const [accountNumber, setAccountNumber] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [dailyPnls, setDailyPnls] = useState<DailyPnL[]>([]);
-  const [allTrades, setAllTrades] = useState([]);
+  const [allTrades, setAllTrades] = useState<Trade[]>([]);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
