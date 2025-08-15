@@ -1,36 +1,28 @@
-import { supabase } from "./supabase";
+// /lib/useUser.ts
+import useSWR from "swr";
+import { supabase } from "@/lib/supabase";
 
-export interface UserSession {
+export interface UserProfile {
   id: string;
+  full_name?: string;
+  username?: string;
   email: string;
-  role: string;
-  createdAt: string;
+  access_level?: string;
+  avatar_url?: string;
 }
 
-let cachedUser: UserSession | null = null;
+export const useUser = () => {
+  return useSWR("user-profile", async (): Promise<UserProfile | null> => {
+    const { data: session } = await supabase.auth.getUser();
+    const email = session?.user?.email;
+    if (!email) return null;
 
-export async function fetchCurrentUser(): Promise<UserSession | null> {
-  if (cachedUser) return cachedUser;
+    const { data: profile } = await supabase
+      .from("users")
+      .select("id, full_name, username, email, access_level, avatar_url")
+      .eq("email", email)
+      .single();
 
-  try {
-    const { data: session, error } = await supabase.auth.getUser();
-    const user = session?.user;
-
-    if (error || !user || !user.email || !user.id) return null;
-
-    cachedUser = {
-      id: user.id,
-      email: user.email,
-      role: user.role ?? "user",
-      createdAt: user.created_at,
-    };
-
-    return cachedUser;
-  } catch {
-    return null;
-  }
-}
-
-export function clearCachedUser() {
-  cachedUser = null;
-}
+    return profile || null;
+  });
+};

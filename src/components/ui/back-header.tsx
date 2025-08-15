@@ -1,10 +1,10 @@
 "use client";
 
-import { ReactNode, MouseEvent } from "react";
+import { ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { useSmartBack } from "@/lib/useSmartBack";
 
 interface BackHeaderProps {
   backHref?: string;
@@ -27,18 +27,16 @@ export function BackHeader({
   sticky = true,
   withBorder = true,
 }: BackHeaderProps) {
-  const smartBack = useSmartBack(fallbackHref);
+  const router = useRouter();
 
-  const handleBack = (e?: MouseEvent) => {
-    e?.preventDefault();
-
-    // Prioriza `backHref`, se definido
+  const handleBack = () => {
     if (backHref) {
-      window.location.href = backHref;
-      return;
+      router.push(backHref);
+    } else if (window.history.length > 1) {
+      router.back();
+    } else {
+      router.push(fallbackHref);
     }
-
-    smartBack();
   };
 
   return (
