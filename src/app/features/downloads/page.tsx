@@ -28,7 +28,7 @@ function formatBytes(bytes?: number): string | undefined {
   return `${mb.toFixed(2)} MB`;
 }
 
-const categoryIcons: Record<Category, JSX.Element> = {
+const categoryIcons: Record<Category, React.ReactNode> = {
   Experts: <span className="text-xl">⚡</span>,
   Sets: <span className="text-xl">⚙️</span>,
   Copiers: <span className="text-xl">📄</span>,
